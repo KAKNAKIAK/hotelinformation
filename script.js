@@ -5,7 +5,7 @@ let currentHotelIndex = -1;
 // DOM 요소 참조 변수
 let hotelTabsContainer, addHotelTabBtn, hotelEditorForm;
 let hotelNameKoInput, hotelNameEnInput, hotelWebsiteInput, hotelImageInput, hotelDescriptionInput;
-let previewHotelBtn, saveHotelHtmlBtn, loadHotelHtmlBtn, savePreviewHtmlBtn, copyHtmlBtn;
+let previewHotelBtn, saveHotelHtmlBtn, loadHotelHtmlBtn, savePreviewHtmlBtn, copyHtmlBtn, manualBtn;
 let hotelHtmlLoadInput;
 
 
@@ -305,11 +305,19 @@ document.addEventListener('DOMContentLoaded', function () {
     loadHotelHtmlBtn = document.getElementById('loadHotelHtmlBtn');
     savePreviewHtmlBtn = document.getElementById('savePreviewHtmlBtn');
     copyHtmlBtn = document.getElementById('copyHtmlBtn');
+    manualBtn = document.getElementById('manualBtn'); // 메뉴얼 버튼 참조 추가
     hotelHtmlLoadInput = document.getElementById('hotelHtmlLoadInput');
 
     if (addHotelTabBtn) addHotelTabBtn.addEventListener('click', addHotel);
     if (previewHotelBtn) previewHotelBtn.addEventListener('click', previewHotelInfo);
     if (copyHtmlBtn) copyHtmlBtn.addEventListener('click', copyOptimizedHtml);
+
+    // 메뉴얼 버튼 이벤트 리스너 추가
+    if (manualBtn) {
+        manualBtn.addEventListener('click', () => {
+            window.open('https://kaknakiak.github.io/hotelinformation/manual/', '_blank');
+        });
+    }
     
     if (savePreviewHtmlBtn) {
         savePreviewHtmlBtn.addEventListener('click', () => {
