@@ -1,0 +1,167 @@
+body { 
+    font-family: 'Inter', sans-serif; 
+    background-color: #f7fafc; 
+}
+.editor-container { 
+    max-width: 900px; 
+    margin: 2rem auto; 
+    background-color: white; 
+    padding: 1.5rem; 
+    border-radius: 0.75rem; 
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+.editor-controls { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 1.5rem; 
+    padding-bottom: 1rem; 
+    border-bottom: 1px solid #e2e8f0; 
+}
+.editor-controls h2 { 
+    font-size: 1.5rem; 
+    font-weight: 700; 
+    color: #2d3748; 
+} 
+.control-buttons button { 
+    padding: 0.5rem 0.8rem; 
+    font-size: 0.875rem; 
+    border-radius: 0.5rem; 
+    color: white; 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 0.4rem; 
+    cursor: pointer; 
+    transition: background-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+.control-buttons button:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+.btn-save { background-color: #4299e1; } 
+.btn-save:hover { background-color: #3182ce; } 
+.btn-load-html { background-color: #f6ad55; } 
+.btn-load-html:hover { background-color: #ed8936; } 
+.btn-load-excel { background-color: #48bb78; } 
+.btn-load-excel:hover { background-color: #38a169; } 
+.btn-preview { background-color: #805ad5; } 
+.btn-preview:hover { background-color: #6b46c1; } 
+
+#hotelTabsContainer { 
+    display: flex; 
+    flex-wrap: wrap; 
+    border-bottom: 2px solid #e2e8f0; 
+    margin-bottom: 1.5rem; 
+    align-items: center; 
+}
+.hotel-tab-button {
+    padding: 0.6rem 1rem; 
+    margin-right: 0.4rem; 
+    margin-bottom: -2px; 
+    border: 2px solid transparent; 
+    border-bottom: none;
+    border-radius: 0.5rem 0.5rem 0 0; 
+    background-color: transparent; 
+    font-size: 0.85rem; 
+    font-weight: 500; 
+    color: #4a5568; 
+    cursor: pointer; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    max-width: 180px;
+    display: inline-flex; 
+    align-items: center; 
+    transition: all 0.2s ease-in-out;
+}
+.hotel-tab-button:hover { 
+    color: #2c5282; 
+    background-color: #ebf8ff; 
+}
+.hotel-tab-button.active { 
+    background-color: #ffffff; 
+    border-color: #e2e8f0 #e2e8f0 #ffffff; 
+    color: #2b6cb0; 
+    font-weight: 600; 
+}
+.tab-title { 
+    flex-grow: 1; 
+    text-align: left; 
+}
+.tab-delete-icon { 
+    margin-left: 0.6rem; 
+    color: #a0aec0; 
+    font-size: 0.75rem; 
+    padding: 2px; 
+}
+.tab-delete-icon:hover { 
+    color: #e53e3e; 
+    background-color: #fed7d7; 
+    border-radius: 50%; 
+}
+#addHotelTabBtn { 
+    color: #4299e1; 
+    border-style: dashed; 
+    border-color: #a0aec0; 
+}
+#addHotelTabBtn:hover { 
+    border-color: #4299e1; 
+    background-color: #ebf8ff; 
+}
+
+#hotelEditorForm { 
+    padding-top: 0.5rem; 
+}
+.input-card-group { 
+    background-color: #ffffff; 
+    padding: 1.25rem; 
+    border-radius: 0.5rem; 
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04); 
+    margin-bottom: 1rem; 
+}
+.form-field {
+    position: relative;
+    margin-bottom: 1rem; 
+}
+.form-field label {
+    position: absolute;
+    left: 0.6rem; 
+    top: 0.6rem;  
+    color: #718096; 
+    pointer-events: none;
+    transition: all 0.2s ease-out;
+    background-color: #ffffff; 
+    padding: 0 0.2rem; 
+    font-size: 0.8rem; 
+}
+.form-field input, .form-field textarea {
+    width: 100%;
+    padding: 0.6rem; 
+    border: 1px solid #cbd5e0; 
+    border-radius: 0.375rem; 
+    font-size: 0.875rem;
+    transition: border-color 0.2s;
+}
+.form-field input:focus, .form-field textarea:focus {
+    outline: none;
+    border-color: #4299e1; 
+    box-shadow: 0 0 0 1px #4299e1; 
+}
+.form-field input:focus + label,
+.form-field input:not(:placeholder-shown) + label,
+.form-field textarea:focus + label,
+.form-field textarea:not(:placeholder-shown) + label {
+    top: -0.5rem; 
+    left: 0.4rem; 
+    font-size: 0.7rem; 
+    color: #4299e1; 
+}
+.form-field textarea { 
+    min-height: 100px; 
+}
+
+#hotelEditorForm.disabled { 
+    opacity: 0.5; 
+    pointer-events: none; 
+    filter: grayscale(50%); 
+}
