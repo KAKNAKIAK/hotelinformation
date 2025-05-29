@@ -177,3 +177,6 @@ body {
     pointer-events: none;
     filter: grayscale(50%);
 }
+
+.btn-manual { background-color: #64748b; }
+.btn-manual:hover { background-color: #475569; }
