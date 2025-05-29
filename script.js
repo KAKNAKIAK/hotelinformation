@@ -4,35 +4,43 @@ let currentHotelIndex = -1;
 
 // DOM 요소 참조 변수
 let hotelTabsContainer, addHotelTabBtn, hotelEditorForm;
-let hotelNameKoInput, hotelNameEnInput, hotelMapLinkInput, hotelImageInput, hotelDescriptionInput;
-let previewHotelBtn, saveHotelHtmlBtn, loadHotelHtmlBtn, loadHotelExcelBtn, savePreviewImageBtn, savePreviewHtmlBtn;
-let hotelHtmlLoadInput, hotelExcelLoadInput;
+let hotelNameKoInput, hotelNameEnInput, hotelWebsiteInput, hotelImageInput, hotelDescriptionInput;
+let previewHotelBtn, saveHotelHtmlBtn, loadHotelHtmlBtn, savePreviewHtmlBtn, copyHtmlBtn;
+let hotelHtmlLoadInput;
 
 
 /**
- * ==================================================================
- * ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 테이블 레이아웃으로 변경 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
- * ==================================================================
  * 호텔 카드 1개에 대한 HTML 코드를 생성하는 헬퍼 함수
  * @param {object} hotel - 호텔 정보 객체
+ * @param {object} options - 추가 옵션 (예: { forImage: true })
  * @returns {string} - 호텔 카드의 HTML 문자열
  */
-function generateHotelCardHtml(hotel) {
+function generateHotelCardHtml(hotel, options = {}) {
+    const { forImage = false } = options; 
+
     const placeholderImage = 'https://placehold.co/400x300/e2e8f0/cbd5e0?text=No+Image';
     const currentHotelImage = (typeof hotel.image === 'string' && hotel.image.startsWith('http')) ? hotel.image : placeholderImage;
 
-    // 상세 설명 텍스트를 줄바꿈 기준으로 나누어 리스트 HTML로 변환
     const descriptionItems = hotel.description ? hotel.description.split('\n').filter(line => line.trim() !== '') : [];
     const descriptionHtml = descriptionItems.map(item => {
         return `
-            <div style="margin-bottom: 8px; line-height: 1.6;">
-                <span style="color: #3498db; margin-right: 8px; font-size: 10px; vertical-align: middle;">●</span>
-                <span style="font-size: 15px; color: #34495e; vertical-align: middle;">${item.replace(/● /g, '')}</span>
+            <div style="margin-bottom: 6px; line-height: 1.6;">
+                <span style="font-size: 14px; color: #34495e; vertical-align: middle;">${item.replace(/● /g, '')}</span>
             </div>
         `;
     }).join('');
 
-    // 어떤 에디터에서도 깨지지 않는 테이블 레이아웃 사용
+    let websiteButtonHtml = '';
+    if (hotel.website && !forImage) {
+        websiteButtonHtml = `
+            <div style="margin-top: 20px;">
+                <a href="${hotel.website}" target="_blank" style="background-color: #3498db; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 14px;">
+                    웹사이트 바로가기
+                </a>
+            </div>
+        `;
+    }
+
     return `
       <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 750px; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; border-collapse: separate; border-spacing: 24px;">
         <tbody>
@@ -47,8 +55,8 @@ function generateHotelCardHtml(hotel) {
                   </tr>
                   <tr>
                     <td style="padding: 16px 20px;">
-                      <div style="font-size: 20px; font-weight: bold; color: #2c3e50; margin: 0;">${hotel.nameKo || '호텔명 없음'}</div>
-                      ${hotel.nameEn ? `<div style="font-size: 14px; color: #7f8c8d; margin-top: 4px;">${hotel.nameEn}</div>` : ''}
+                      <div style="font-size: 18px; font-weight: bold; color: #2c3e50; margin: 0;">${hotel.nameKo || '호텔명 없음'}</div>
+                      ${hotel.nameEn ? `<div style="font-size: 13px; color: #7f8c8d; margin-top: 4px;">${hotel.nameEn}</div>` : ''}
                     </td>
                   </tr>
                 </tbody>
@@ -57,12 +65,7 @@ function generateHotelCardHtml(hotel) {
             <td style="vertical-align: middle;">
               <div>
                 ${descriptionHtml}
-                ${hotel.mapLink ? `
-                  <div style="margin-top: 24px;">
-                    <a href="${hotel.mapLink}" target="_blank" style="background-color: #3498db; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 16px;">
-                      지도 보기
-                    </a>
-                  </div>` : ''}
+                ${websiteButtonHtml}
               </div>
             </td>
           </tr>
@@ -74,10 +77,11 @@ function generateHotelCardHtml(hotel) {
 
 /**
  * 미리보기(팝업 또는 HTML 파일)를 위한 전체 HTML 페이지 코드를 생성합니다.
+ * @param {Array} data - HTML로 만들 호텔 데이터 배열
  * @returns {string} - 전체 HTML 페이지의 문자열
  */
-function generateFullPreviewHtml() {
-    const hotelName = allHotelData.length > 0 ? allHotelData[0].nameKo : '호텔';
+function generateFullPreviewHtml(data) {
+    const hotelName = data.length > 0 ? data[0].nameKo : '호텔';
 
     const sliderHead = `
         <link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" />
@@ -95,8 +99,8 @@ function generateFullPreviewHtml() {
 
     let bodyContent;
 
-    if (allHotelData.length > 1) {
-        const slides = allHotelData.map(hotel => `<div class="swiper-slide">${generateHotelCardHtml(hotel)}</div>`).join('');
+    if (data.length > 1) {
+        const slides = data.map(hotel => `<div class="swiper-slide">${generateHotelCardHtml(hotel)}</div>`).join('');
         bodyContent = `
             <div class="swiper" style="max-width: 800px; margin: auto;">
                 <div class="swiper-wrapper">${slides}</div>
@@ -106,8 +110,8 @@ function generateFullPreviewHtml() {
             </div>
             ${sliderBodyScript}
         `;
-    } else if (allHotelData.length === 1) {
-        bodyContent = generateHotelCardHtml(allHotelData[0]);
+    } else if (data.length === 1) {
+        bodyContent = generateHotelCardHtml(data[0]);
     } else {
         bodyContent = '<h1 style="text-align: center;">표시할 호텔 정보가 없습니다.</h1>';
     }
@@ -120,7 +124,7 @@ function generateFullPreviewHtml() {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>호텔 안내: ${hotelName}</title>
-            ${allHotelData.length > 1 ? sliderHead : ''}
+            ${data.length > 1 ? sliderHead : ''}
             <style>
                 body {
                     font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
@@ -148,76 +152,26 @@ function generateFullPreviewHtml() {
 }
 
 /**
- * 현재 호텔의 미리보기 화면을 단독 HTML 파일로 저장합니다.
+ * 현재 선택된 호텔의 HTML 코드를 클립보드에 복사합니다.
  */
-function savePreviewAsHtml() {
-    syncCurrentHotelData();
-    if (allHotelData.length === 0) {
-        alert('저장할 호텔 정보가 없습니다.');
-        return;
-    }
-
-    const finalHtml = generateFullPreviewHtml();
-    const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' });
-    const link = document.createElement('a');
-    
-    const fileName = (allHotelData.length > 0 && allHotelData[0].nameKo) ? allHotelData[0].nameKo.replace(/[\s\/\\?%*:|"<>]/g, '_') : '호텔모음';
-    link.download = `${fileName}_안내.html`;
-    
-    link.href = URL.createObjectURL(blob);
-    link.click();
-    URL.revokeObjectURL(link.href);
-}
-
-
-/**
- * 미리보기 카드를 이미지 파일(PNG)로 저장합니다.
- */
-async function savePreviewAsImage() {
-    syncCurrentHotelData();
-    if (currentHotelIndex === -1 || !allHotelData[currentHotelIndex]) {
-        alert('이미지로 저장할 호텔을 선택해주세요.');
+function copyOptimizedHtml() {
+    if (currentHotelIndex === -1) {
+        alert('먼저 복사할 호텔 탭을 선택해주세요.');
         return;
     }
     const hotel = allHotelData[currentHotelIndex];
-    
-    // 테이블 레이아웃은 외부 스타일 없이 자체적으로 렌더링되므로, 별도 스타일 주입 불필요
-    const offscreenContainer = document.createElement('div');
-    offscreenContainer.style.position = 'absolute';
-    offscreenContainer.style.left = '-9999px';
-    offscreenContainer.style.padding = '2rem'; // 배경색이 보이도록 패딩 추가
-    offscreenContainer.style.backgroundColor = '#f0f2f5'; // 배경색 지정
-    offscreenContainer.innerHTML = generateHotelCardHtml(hotel);
-    
-    document.body.appendChild(offscreenContainer);
+    // 웹사이트 버튼을 포함한 순수 HTML 코드 생성
+    const htmlToCopy = generateHotelCardHtml(hotel, { forImage: false });
 
-    const cardToRender = offscreenContainer.querySelector('table');
-    const imageToLoad = offscreenContainer.querySelector('img');
-
-    await new Promise((resolve) => {
-        if (imageToLoad.complete) { resolve(); return; }
-        imageToLoad.onload = resolve;
-        imageToLoad.onerror = () => { imageToLoad.src = 'https://placehold.co/400x300/e2e8f0/cbd5e0?text=No+Image'; resolve(); };
+    // 최신 Clipboard API를 사용하여 텍스트 복사
+    navigator.clipboard.writeText(htmlToCopy).then(() => {
+        alert('호텔 카드 HTML 코드가 클립보드에 복사되었습니다.');
+    }).catch(err => {
+        console.error('클립보드 복사 실패:', err);
+        alert('오류가 발생하여 복사하지 못했습니다. 브라우저 개발자 콘솔을 확인해주세요.');
     });
-
-    try {
-        const canvas = await html2canvas(cardToRender, {
-            useCORS: true,
-            scale: 2,
-            backgroundColor: '#f0f2f5',
-        });
-        const link = document.createElement('a');
-        const fileName = (hotel.nameKo || 'hotel-preview').replace(/ /g, '_');
-        link.download = `${fileName}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    } catch (err) {
-        console.error('이미지 생성 오류:', err);
-        alert('이미지를 생성하지 못했습니다. 외부 이미지의 CORS 정책 문제일 수 있습니다.');
-    } finally {
-        document.body.removeChild(offscreenContainer);
-    }
 }
+
 
 /**
  * 현재 선택된 호텔 정보를 새 창에서 미리보기로 보여줍니다.
@@ -229,7 +183,7 @@ function previewHotelInfo() {
         return;
     }
 
-    const previewHtml = generateFullPreviewHtml();
+    const previewHtml = generateFullPreviewHtml(allHotelData);
     const previewWindow = window.open('', '_blank', 'width=900,height=600,scrollbars=yes,resizable=yes');
     if (previewWindow) {
         previewWindow.document.open();
@@ -240,9 +194,6 @@ function previewHotelInfo() {
         alert('팝업 차단 기능이 활성화되어 미리보기를 열 수 없습니다.');
     }
 }
-
-// 이하 기능은 변경되지 않았습니다.
-// (renderTabs, renderEditorForCurrentHotel, switchTab, addHotel, deleteHotel, syncCurrentHotelData, DOMContentLoaded 등)
 
 function renderTabs() {
     if (!hotelTabsContainer || !addHotelTabBtn) return;
@@ -269,12 +220,12 @@ function renderTabs() {
 }
 
 function renderEditorForCurrentHotel() {
-    if (!hotelEditorForm || !hotelNameKoInput || !hotelNameEnInput || !hotelMapLinkInput || !hotelImageInput || !hotelDescriptionInput) return;
+    if (!hotelEditorForm || !hotelNameKoInput || !hotelNameEnInput || !hotelWebsiteInput || !hotelImageInput || !hotelDescriptionInput) return;
     if (currentHotelIndex === -1 || !allHotelData[currentHotelIndex]) {
         hotelEditorForm.classList.add('disabled');
         hotelNameKoInput.value = '';
         hotelNameEnInput.value = '';
-        hotelMapLinkInput.value = '';
+        hotelWebsiteInput.value = '';
         hotelImageInput.value = '';
         hotelDescriptionInput.value = '';
         document.querySelectorAll('#hotelEditorForm input, #hotelEditorForm textarea').forEach(el => {
@@ -286,7 +237,7 @@ function renderEditorForCurrentHotel() {
     const hotel = allHotelData[currentHotelIndex];
     hotelNameKoInput.value = hotel.nameKo || '';
     hotelNameEnInput.value = hotel.nameEn || '';
-    hotelMapLinkInput.value = hotel.mapLink || '';
+    hotelWebsiteInput.value = hotel.website || '';
     const imageUrl = (typeof hotel.image === 'string' && (hotel.image.startsWith('http://') || hotel.image.startsWith('https://'))) ? hotel.image : '';
     hotelImageInput.value = imageUrl;
     hotelDescriptionInput.value = hotel.description || '';
@@ -306,7 +257,7 @@ function switchTab(index) {
 }
 
 function addHotel() {
-    const newHotel = { nameKo: `새 호텔 ${allHotelData.length + 1}`, nameEn: "", mapLink: "", image: "", description: "" };
+    const newHotel = { nameKo: `새 호텔 ${allHotelData.length + 1}`, nameEn: "", website: "", image: "", description: "" };
     allHotelData.push(newHotel);
     switchTab(allHotelData.length - 1);
 }
@@ -335,7 +286,7 @@ function syncCurrentHotelData() {
     const hotel = allHotelData[currentHotelIndex];
     hotel.nameKo = hotelNameKoInput.value.trim();
     hotel.nameEn = hotelNameEnInput.value.trim();
-    hotel.mapLink = hotelMapLinkInput.value.trim();
+    hotel.website = hotelWebsiteInput.value.trim();
     hotel.image = hotelImageInput.value.trim();
     hotel.description = hotelDescriptionInput.value.trim();
 }
@@ -346,24 +297,45 @@ document.addEventListener('DOMContentLoaded', function () {
     hotelEditorForm = document.getElementById('hotelEditorForm');
     hotelNameKoInput = document.getElementById('hotelNameKo');
     hotelNameEnInput = document.getElementById('hotelNameEn');
-    hotelMapLinkInput = document.getElementById('hotelMapLink');
+    hotelWebsiteInput = document.getElementById('hotelWebsite');
     hotelImageInput = document.getElementById('hotelImage');
     hotelDescriptionInput = document.getElementById('hotelDescription');
     previewHotelBtn = document.getElementById('previewHotelBtn');
     saveHotelHtmlBtn = document.getElementById('saveHotelHtmlBtn');
     loadHotelHtmlBtn = document.getElementById('loadHotelHtmlBtn');
-    loadHotelExcelBtn = document.getElementById('loadHotelExcelBtn');
-    savePreviewImageBtn = document.getElementById('savePreviewImageBtn');
     savePreviewHtmlBtn = document.getElementById('savePreviewHtmlBtn');
+    copyHtmlBtn = document.getElementById('copyHtmlBtn');
     hotelHtmlLoadInput = document.getElementById('hotelHtmlLoadInput');
-    hotelExcelLoadInput = document.getElementById('hotelExcelLoadInput');
 
     if (addHotelTabBtn) addHotelTabBtn.addEventListener('click', addHotel);
     if (previewHotelBtn) previewHotelBtn.addEventListener('click', previewHotelInfo);
-    if (savePreviewImageBtn) savePreviewImageBtn.addEventListener('click', savePreviewAsImage);
-    if (savePreviewHtmlBtn) savePreviewHtmlBtn.addEventListener('click', savePreviewAsHtml);
+    if (copyHtmlBtn) copyHtmlBtn.addEventListener('click', copyOptimizedHtml);
+    
+    if (savePreviewHtmlBtn) {
+        savePreviewHtmlBtn.addEventListener('click', () => {
+            syncCurrentHotelData();
+            if (allHotelData.length === 0) {
+                alert('저장할 호텔 정보가 없습니다.');
+                return;
+            }
+            if (!confirm(`총 ${allHotelData.length}개의 호텔 안내 HTML 파일을 각각 저장하시겠습니까?`)) {
+                return;
+            }
+            allHotelData.forEach((hotel, index) => {
+                const finalHtml = generateFullPreviewHtml([hotel]);
+                const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' });
+                const link = document.createElement('a');
+                const safeFileName = (hotel.nameKo || `호텔_${index + 1}`).replace(/[\s\/\\?%*:|"<>]/g, '_');
+                link.download = `${safeFileName}_안내.html`;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                URL.revokeObjectURL(link.href);
+            });
+            alert(`${allHotelData.length}개의 호텔 안내 파일 저장이 시작되었습니다.`);
+        });
+    }
 
-    [hotelNameKoInput, hotelNameEnInput, hotelMapLinkInput, hotelImageInput, hotelDescriptionInput].forEach(input => {
+    [hotelNameKoInput, hotelNameEnInput, hotelWebsiteInput, hotelImageInput, hotelDescriptionInput].forEach(input => {
         if (input) {
             input.addEventListener('input', () => {
                 syncCurrentHotelData();
@@ -382,13 +354,13 @@ document.addEventListener('DOMContentLoaded', function () {
             syncCurrentHotelData(); 
             if (allHotelData.length === 0) { alert('저장할 호텔 정보가 없습니다.'); return; }
             if (!confirm(`총 ${allHotelData.length}개의 호텔 정보를 각각 개별 파일로 저장하시겠습니까?`)) return;
-            allHotelData.forEach(hotel => {
+            allHotelData.forEach((hotel, index) => {
                 const singleHotelDataArray = [hotel];
                 const dataStr = JSON.stringify(singleHotelDataArray);
                 const htmlContent = `<!DOCTYPE html><html><head><title>저장된 호텔 데이터</title></head><body><script type="application/json" id="embeddedHotelData">${dataStr.replace(/<\/script>/g, '<\\/script>')}<\/script><p>이 파일은 호텔 정보 복원용입니다. 편집기에서 '데이터 불러오기'로 열어주세요.</p></body></html>`;
                 const blob = new Blob([htmlContent], { type: 'text/html' });
                 const a = document.createElement('a');
-                const safeFileName = (hotel.nameKo || `호텔_데이터_${allHotelData.indexOf(hotel) + 1}`).replace(/[\s\/\\?%*:|"<>]/g, '_');
+                const safeFileName = (hotel.nameKo || `호텔_데이터_${index + 1}`).replace(/[\s\/\\?%*:|"<>]/g, '_');
                 a.download = `${safeFileName}_데이터.html`;
                 a.href = URL.createObjectURL(blob);
                 a.click();
@@ -414,7 +386,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (!dataScript || !dataScript.textContent) throw new Error('파일에서 호텔 데이터를 찾을 수 없습니다.');
                     const loadedData = JSON.parse(dataScript.textContent);
                     if (!Array.isArray(loadedData)) throw new Error('데이터 형식이 올바르지 않습니다 (배열이 아님).');
-                    const newHotels = loadedData.map(hotel => ({ nameKo: hotel.nameKo || "", nameEn: hotel.nameEn || "", mapLink: hotel.mapLink || "", image: hotel.image || "", description: hotel.description || "" }));
+                    const newHotels = loadedData.map(hotel => ({ nameKo: hotel.nameKo || "", nameEn: hotel.nameEn || "", website: hotel.website || "", image: hotel.image || "", description: hotel.description || "" }));
                     allHotelData.push(...newHotels);
                     switchTab(allHotelData.length - 1);
                     alert(`호텔 ${newHotels.length}개를 성공적으로 불러왔습니다.`);
@@ -423,48 +395,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             };
             reader.readAsText(file);
-            e.target.value = '';
-        });
-    }
-
-    if (loadHotelExcelBtn) {
-        loadHotelExcelBtn.addEventListener('click', () => {
-            if (currentHotelIndex === -1) { alert('엑셀 데이터를 적용할 호텔을 먼저 선택하거나 추가해주세요.'); return; }
-            hotelExcelLoadInput.click();
-        });
-    }
-
-    if (hotelExcelLoadInput) {
-        hotelExcelLoadInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file || currentHotelIndex === -1) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const data = new Uint8Array(event.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const sheetName = workbook.SheetNames[0];
-                    if (!sheetName) throw new Error("엑셀 파일에 시트가 없습니다.");
-                    const hotelInfoSheet = workbook.Sheets[sheetName];
-                    const hotelJson = XLSX.utils.sheet_to_json(hotelInfoSheet, { header: 1 });
-                    if (hotelJson.length < 2 || !Array.isArray(hotelJson[1]) || hotelJson[1].every(cell => cell === null || cell === '')) {
-                        throw new Error('엑셀 파일 두 번째 행에 유효한 데이터가 없습니다. A2, B2 등에 정보를 입력해주세요.');
-                    }
-                    const hotelRow = hotelJson[1];
-                    const hotel = allHotelData[currentHotelIndex];
-                    hotel.nameKo = hotelRow[0] || hotel.nameKo;
-                    hotel.nameEn = hotelRow[1] || hotel.nameEn;
-                    hotel.mapLink = hotelRow[2] || hotel.mapLink;
-                    hotel.image = hotelRow[3] || hotel.image;
-                    hotel.description = hotelRow[4] || hotel.description;
-                    renderEditorForCurrentHotel();
-                    renderTabs();
-                    alert(`'${hotel.nameKo}' 호텔 정보에 엑셀 데이터를 적용했습니다.`);
-                } catch (err) {
-                    alert(`엑셀 파일 처리 오류: ${err.message}`);
-                }
-            };
-            reader.readAsArrayBuffer(file);
             e.target.value = '';
         });
     }
