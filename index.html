@@ -12,11 +12,12 @@
     <div class="editor-container">
         <div class="editor-controls">
             <h2>호텔 정보 편집기</h2>
-            <div class="control-buttons flex space-x-2">
+            <div class="control-buttons flex flex-wrap gap-2 justify-end">
+                <button id="savePreviewHtmlBtn" class="btn-save-preview-html"><i class="fas fa-file-alt"></i>호텔안내 HTML 저장</button>
                 <button id="savePreviewImageBtn" class="btn-image-save"><i class="fas fa-camera"></i>이미지로 저장</button>
                 <button id="previewHotelBtn" class="btn-preview"><i class="fas fa-eye"></i>미리보기</button>
-                <button id="saveHotelHtmlBtn" class="btn-save"><i class="fas fa-file-code"></i>전체 HTML 저장</button>
-                <button id="loadHotelHtmlBtn" class="btn-load-html"><i class="fas fa-upload"></i>HTML 불러오기</button>
+                <button id="saveHotelHtmlBtn" class="btn-save"><i class="fas fa-database"></i>호텔안내 데이터 저장</button>
+                <button id="loadHotelHtmlBtn" class="btn-load-html"><i class="fas fa-upload"></i>데이터 불러오기</button>
                 <button id="loadHotelExcelBtn" class="btn-load-excel" title="현재 선택된 호텔 정보를 엑셀로 덮어씁니다."><i class="fas fa-file-excel"></i>선택 호텔 엑셀 적용</button>
             </div>
         </div>
@@ -48,10 +49,10 @@
                         <label for="hotelImage">대표 이미지 URL</label>
                     </div>
                 </div>
-            
+
                 <div class="form-field mt-4">
                     <textarea id="hotelDescription" placeholder=" "></textarea>
-                    <label for="hotelDescription">간단 설명</label>
+                    <label for="hotelDescription">간단 설명 (줄바꿈으로 항목 구분)</label>
                 </div>
             </div>
         </div>
@@ -59,7 +60,7 @@
 
     <input type="file" id="hotelHtmlLoadInput" accept=".html" style="display: none;">
     <input type="file" id="hotelExcelLoadInput" accept=".xlsx, .csv" style="display: none;">
-    
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="script.js"></script>
