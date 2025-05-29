@@ -202,9 +202,6 @@ function previewHotelInfo() {
 }
 
 
-// 이하 기능은 변경되지 않았습니다.
-// (renderTabs, renderEditorForCurrentHotel, switchTab, addHotel, deleteHotel, syncCurrentHotelData, DOMContentLoaded 등)
-
 /**
  * 현재 호텔 데이터(allHotelData)를 기반으로 탭 UI를 다시 그립니다.
  */
@@ -390,30 +387,48 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // ==================================================================
+    // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼ 여기가 수정된 부분입니다 ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+    // ==================================================================
     if (saveHotelHtmlBtn) {
         saveHotelHtmlBtn.addEventListener('click', () => {
-            syncCurrentHotelData();
+            syncCurrentHotelData(); // 현재 편집 중인 폼의 내용을 배열에 반영
             if (allHotelData.length === 0) {
                 alert('저장할 호텔 정보가 없습니다.');
                 return;
             }
-            const dataStr = JSON.stringify(allHotelData);
-            const htmlContent = `<!DOCTYPE html><html><head><title>저장된 호텔 목록</title></head><body><script type="application/json" id="embeddedHotelData">${dataStr.replace(/<\/script>/g, '<\\/script>')}<\/script><p>이 파일은 호텔 정보 복원용입니다. 편집기에서 'HTML 불러오기'로 열어주세요.</p></body></html>`;
-            const blob = new Blob([htmlContent], { type: 'text/html' });
-            const a = document.createElement('a');
 
-            let fileNamePrefix = '전체_호텔';
-            if (allHotelData.length > 0 && allHotelData[0].nameKo) {
-                fileNamePrefix = allHotelData[0].nameKo.replace(/ /g, '_');
+            // 사용자에게 개별 파일 저장 여부 확인
+            if (!confirm(`총 ${allHotelData.length}개의 호텔 정보를 각각 개별 파일로 저장하시겠습니까?`)) {
+                return;
             }
-            a.download = `${fileNamePrefix}_데이터.html`;
 
-            a.href = URL.createObjectURL(blob);
-            a.click();
-            URL.revokeObjectURL(a.href);
-            alert('모든 호텔 정보가 데이터 파일로 저장되었습니다.');
+            // 모든 호텔 데이터에 대해 반복 실행
+            allHotelData.forEach((hotel, index) => {
+                // 불러오기 기능과 호환성을 위해 개별 호텔 객체를 배열로 감싸줍니다.
+                const singleHotelDataArray = [hotel];
+                const dataStr = JSON.stringify(singleHotelDataArray);
+
+                // 파일에 저장될 HTML 내용을 생성합니다.
+                const htmlContent = `<!DOCTYPE html><html><head><title>저장된 호텔 데이터</title></head><body><script type="application/json" id="embeddedHotelData">${dataStr.replace(/<\/script>/g, '<\\/script>')}<\/script><p>이 파일은 호텔 정보 복원용입니다. 편집기에서 '데이터 불러오기'로 열어주세요.</p></body></html>`;
+                const blob = new Blob([htmlContent], { type: 'text/html' });
+                const a = document.createElement('a');
+
+                // 파일명으로 사용할 수 없는 특수문자를 '_'로 변경합니다.
+                const safeFileName = (hotel.nameKo || `호텔_데이터_${index + 1}`).replace(/[\s\/\\?%*:|"<>]/g, '_');
+                a.download = `${safeFileName}_데이터.html`;
+
+                a.href = URL.createObjectURL(blob);
+                a.click(); // 다운로드 실행
+                URL.revokeObjectURL(a.href); // 메모리 해제
+            });
+
+            alert(`${allHotelData.length}개의 호텔 정보 파일 저장이 시작되었습니다.`);
         });
     }
+    // ==================================================================
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲ 여기가 수정된 부분입니다 ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+    // ==================================================================
 
     if (loadHotelHtmlBtn) loadHotelHtmlBtn.addEventListener('click', () => hotelHtmlLoadInput.click());
 
@@ -430,22 +445,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     const loadedData = JSON.parse(dataScript.textContent);
                     if (!Array.isArray(loadedData)) throw new Error('데이터 형식이 올바르지 않습니다 (배열이 아님).');
-
-                    allHotelData = loadedData.map(hotel => ({
+                    
+                    // 불러온 데이터를 기존 데이터에 추가합니다.
+                    const newHotels = loadedData.map(hotel => ({
                         nameKo: hotel.nameKo || "",
                         nameEn: hotel.nameEn || "",
                         mapLink: hotel.mapLink || "",
                         image: hotel.image || "",
                         description: hotel.description || ""
                     }));
-                    switchTab(allHotelData.length > 0 ? 0 : -1);
-                    alert(`호텔 목록 ${allHotelData.length}개를 성공적으로 불러왔습니다.`);
+
+                    allHotelData.push(...newHotels);
+
+                    // 마지막으로 추가된 호텔 탭으로 전환합니다.
+                    switchTab(allHotelData.length - 1);
+                    alert(`호텔 ${newHotels.length}개를 성공적으로 불러왔습니다.`);
+
                 } catch (err) {
                     alert(`파일 처리 오류: ${err.message}`);
                 }
             };
             reader.readAsText(file);
-            e.target.value = '';
+            e.target.value = ''; // 같은 파일을 다시 불러올 수 있도록 초기화
         });
     }
 
