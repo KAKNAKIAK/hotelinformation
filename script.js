@@ -8,83 +8,311 @@ let hotelNameKoInput, hotelNameEnInput, hotelMapLinkInput, hotelImageInput, hote
 let previewHotelBtn, saveHotelHtmlBtn, loadHotelHtmlBtn, loadHotelExcelBtn;
 let hotelHtmlLoadInput, hotelExcelLoadInput;
 
+/**
+ * 현재 호텔 데이터(allHotelData)를 기반으로 탭 UI를 다시 그립니다.
+ */
 function renderTabs() {
-    console.log("[Function Called] renderTabs, currentHotelIndex:", currentHotelIndex); // 로그 추가
-    // ... (기존 renderTabs 내용) ...
+    if (!hotelTabsContainer || !addHotelTabBtn) return; // 필수 요소 확인
+
+    const existingTabs = hotelTabsContainer.querySelectorAll('.hotel-tab-button:not(#addHotelTabBtn)');
+    existingTabs.forEach(tab => tab.remove());
+
+    allHotelData.forEach((hotel, index) => {
+        const tabButton = document.createElement('button');
+        tabButton.className = 'hotel-tab-button';
+        tabButton.dataset.index = index; 
+        if (index === currentHotelIndex) {
+            tabButton.classList.add('active'); 
+        }
+        tabButton.innerHTML = `
+            <span class="tab-title">${hotel.nameKo || `새 호텔 ${index + 1}`}</span>
+            <i class="fas fa-times tab-delete-icon" title="이 호텔 정보 삭제"></i>
+        `;
+        // '새 호텔 추가' 버튼 앞에 탭 버튼 삽입
+        hotelTabsContainer.insertBefore(tabButton, addHotelTabBtn);
+
+        // 삭제 아이콘에 이벤트 리스너 추가
+        const deleteIcon = tabButton.querySelector('.tab-delete-icon');
+        if (deleteIcon) {
+            deleteIcon.addEventListener('click', (e) => {
+                e.stopPropagation(); // 탭 버튼 클릭 이벤트 전파 방지
+                deleteHotel(index); // 해당 인덱스의 호텔 삭제 함수 호출
+            });
+        }
+        // 탭 버튼 클릭 시 해당 탭 활성화 함수 호출
+        tabButton.addEventListener('click', () => {
+            switchTab(index);
+        });
+    });
 }
 
+/**
+ * 현재 선택된 호텔(currentHotelIndex)의 정보를 입력 폼에 표시합니다.
+ * 선택된 호텔이 없으면 폼을 비활성화하고 초기화합니다.
+ */
 function renderEditorForCurrentHotel() {
-    console.log("[Function Called] renderEditorForCurrentHotel, currentHotelIndex:", currentHotelIndex); // 로그 추가
-    // ... (기존 renderEditorForCurrentHotel 내용) ...
+    if (!hotelEditorForm || !hotelNameKoInput || !hotelNameEnInput || !hotelMapLinkInput || !hotelImageInput || !hotelDescriptionInput) return; // 필수 요소 확인
+
+    if (currentHotelIndex === -1 || !allHotelData[currentHotelIndex]) {
+        hotelEditorForm.classList.add('disabled'); 
+        // 입력 필드 초기화
+        hotelNameKoInput.value = '';
+        hotelNameEnInput.value = '';
+        hotelMapLinkInput.value = '';
+        hotelImageInput.value = '';
+        hotelDescriptionInput.value = '';
+        // Floating label을 위해 placeholder를 공백으로 설정
+        document.querySelectorAll('#hotelEditorForm input, #hotelEditorForm textarea').forEach(el => {
+            if(el.value === '') el.placeholder = ' '; 
+        });
+        return;
+    }
+
+    hotelEditorForm.classList.remove('disabled'); 
+    const hotel = allHotelData[currentHotelIndex]; 
+    // 호텔 데이터로 입력 필드 채우기
+    hotelNameKoInput.value = hotel.nameKo || '';
+    hotelNameEnInput.value = hotel.nameEn || '';
+    hotelMapLinkInput.value = hotel.mapLink || '';
+    // 이미지 URL 유효성 검사 후 할당
+    const imageUrl = (typeof hotel.image === 'string' && (hotel.image.startsWith('http://') || hotel.image.startsWith('https://'))) ? hotel.image : '';
+    hotelImageInput.value = imageUrl; 
+    hotelDescriptionInput.value = hotel.description || '';
+    
+    // 값이 있는 필드는 placeholder를 공백으로 하여 floating label이 즉시 적용되도록 함
+    document.querySelectorAll('#hotelEditorForm input, #hotelEditorForm textarea').forEach(el => {
+        if(el.value !== '') el.placeholder = ' ';
+    });
 }
 
+/**
+ * 지정된 인덱스의 탭으로 전환합니다.
+ * @param {number} index - 활성화할 탭의 인덱스
+ */
 function switchTab(index) {
-    console.log("[Function Called] switchTab, switching to index:", index); // 로그 추가
-    // ... (기존 switchTab 내용) ...
+    // 유효하지 않은 인덱스 처리 (단, 모든 탭이 삭제되어 -1이 되는 경우는 허용)
+    if (index < -1 || (index >= allHotelData.length && allHotelData.length > 0) ) {
+         return;
+    }
+    
+    // 현재 활성화된 탭의 데이터를 저장 (만약 유효한 탭이었다면, 그리고 다른 탭으로 전환되는 경우)
+    if (currentHotelIndex !== -1 && currentHotelIndex < allHotelData.length && currentHotelIndex !== index) {
+         syncCurrentHotelData();
+    }
+    
+    currentHotelIndex = index; 
+    renderTabs(); 
+    renderEditorForCurrentHotel(); 
 }
 
+/**
+ * 새 호텔 정보를 allHotelData 배열에 추가하고 해당 탭으로 전환합니다.
+ */
 function addHotel() {
-    console.log("[Function Called] addHotel"); // 로그 추가
-    // ... (기존 addHotel 내용) ...
+    const newHotel = { 
+        nameKo: `새 호텔 ${allHotelData.length + 1}`, 
+        nameEn: "", 
+        mapLink: "", 
+        image: "", 
+        description: "" 
+    };
+    allHotelData.push(newHotel);
+    switchTab(allHotelData.length - 1); // 새로 추가된 호텔 탭 활성화
 }
 
+/**
+ * 지정된 인덱스의 호텔 정보를 삭제합니다.
+ * @param {number} indexToDelete - 삭제할 호텔의 인덱스
+ */
 function deleteHotel(indexToDelete) {
-    console.log("[Function Called] deleteHotel, indexToDelete:", indexToDelete); // 로그 추가
-    // ... (기존 deleteHotel 내용) ...
+    if (indexToDelete < 0 || indexToDelete >= allHotelData.length) {
+        return; // 유효하지 않은 인덱스면 함수 종료
+    }
+
+    const hotelName = allHotelData[indexToDelete].nameKo || '이 호텔';
+    if (!confirm(`'${hotelName}' 정보를 삭제하시겠습니까?`)) {
+        return; // 사용자가 취소하면 함수 종료
+    }
+
+    allHotelData.splice(indexToDelete, 1); // 배열에서 호텔 정보 제거
+
+    let newActiveIndex = -1; 
+    if (allHotelData.length > 0) { // 호텔이 남아있는 경우
+        if (currentHotelIndex === indexToDelete) { // 현재 활성 탭이 삭제된 경우
+            // 삭제된 탭의 인덱스 또는 그 이전 인덱스를 새 활성 인덱스로 시도
+            // 단, 배열 범위를 벗어나지 않도록 조정
+            newActiveIndex = Math.min(indexToDelete, allHotelData.length - 1);
+        } else if (currentHotelIndex > indexToDelete) { // 현재 활성 탭보다 앞의 탭이 삭제된 경우
+            newActiveIndex = currentHotelIndex - 1;
+        } else { // 현재 활성 탭보다 뒤의 탭이 삭제된 경우 (또는 currentHotelIndex가 -1이었던 경우)
+            newActiveIndex = currentHotelIndex; // 기존 인덱스 유지
+        }
+    }
+    // newActiveIndex가 여전히 -1이거나 유효한 범위 내에 있도록 최종 조정
+    if (allHotelData.length === 0) {
+        newActiveIndex = -1;
+    } else {
+        newActiveIndex = Math.max(0, Math.min(newActiveIndex, allHotelData.length - 1));
+        if (allHotelData.length === 1) newActiveIndex = 0; // 아이템이 하나만 남으면 무조건 0번 인덱스
+    }
+    
+    currentHotelIndex = newActiveIndex; // 전역 currentHotelIndex 업데이트
+    renderTabs(); // 탭 UI 다시 그리기
+    renderEditorForCurrentHotel(); // 편집기 폼 다시 그리기
 }
 
+/**
+ * 현재 입력 폼의 내용을 allHotelData 배열의 현재 호텔 객체에 동기화(저장)합니다.
+ */
 function syncCurrentHotelData() {
-    if (currentHotelIndex === -1 || !allHotelData[currentHotelIndex]) return; 
-    console.log("[Function Called] syncCurrentHotelData for index:", currentHotelIndex); // 로그 추가
-    // ... (기존 syncCurrentHotelData 내용) ...
+    if (currentHotelIndex === -1 || !allHotelData[currentHotelIndex]) {
+        return; // 선택된 호텔이 없으면 동기화 안 함
+    }
+    const hotel = allHotelData[currentHotelIndex];
+    hotel.nameKo = hotelNameKoInput.value;
+    hotel.nameEn = hotelNameEnInput.value;
+    hotel.mapLink = hotelMapLinkInput.value;
+    hotel.image = hotelImageInput.value;
+    hotel.description = hotelDescriptionInput.value;
 }
 
+/**
+ * 현재 선택된 호텔 정보를 새 창에서 미리보기로 보여줍니다.
+ */
 function previewHotelInfo() {
-    console.log("[Function Called] previewHotelInfo"); // 로그 추가
-    // ... (기존 previewHotelInfo 내용) ...
-}
+    syncCurrentHotelData(); // 미리보기 전 현재 폼 내용 저장
 
+    if (currentHotelIndex === -1 || !allHotelData[currentHotelIndex]) {
+        alert('미리보기할 호텔을 선택해주세요.');
+        return;
+    }
+    const hotel = allHotelData[currentHotelIndex];
+    const placeholderImage = 'https://placehold.co/600x400/e2e8f0/cbd5e0?text=No+Image';
+    // 이미지 URL 유효성 검사 후 할당
+    const currentHotelImage = (typeof hotel.image === 'string' && (hotel.image.startsWith('http://') || hotel.image.startsWith('https://'))) ? hotel.image : placeholderImage;
+
+    const previewHtml = `
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>호텔 정보 미리보기: ${hotel.nameKo || '호텔'}</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+                body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 2rem; box-sizing: border-box; }
+                .hotel-card { 
+                    background-color: white; 
+                    border-radius: 0.75rem; 
+                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+                    width: 100%;
+                    max-width: 384px; 
+                    overflow: hidden;
+                }
+                .hotel-card-image {
+                    width: 100%;
+                    height: 224px; 
+                    object-fit: cover;
+                }
+                .hotel-card-content {
+                    padding: 1.25rem; 
+                }
+                .hotel-card-title-ko {
+                    font-size: 1.25rem; 
+                    font-weight: 600; 
+                    color: #1a202c; 
+                    margin-bottom: 0.25rem; 
+                }
+                .hotel-card-title-en {
+                    font-size: 0.875rem; 
+                    color: #718096; 
+                    margin-bottom: 1rem; 
+                }
+                .hotel-card-description {
+                    font-size: 0.875rem; 
+                    color: #4a5568; 
+                    line-height: 1.6;
+                    margin-bottom: 1.25rem; 
+                    white-space: pre-wrap; 
+                }
+                .hotel-card-link {
+                    display: inline-block;
+                    background-color: #4299e1; 
+                    color: white;
+                    padding: 0.5rem 1rem; 
+                    border-radius: 0.375rem; 
+                    font-size: 0.875rem; 
+                    font-weight: 500; 
+                    text-decoration: none;
+                    transition: background-color 0.2s;
+                }
+                .hotel-card-link:hover {
+                    background-color: #3182ce; 
+                }
+            </style>
+        </head>
+        <body>
+            <div class="hotel-card">
+                <img src="${currentHotelImage}" alt="${hotel.nameKo || '호텔 이미지'}" class="hotel-card-image" onerror="this.onerror=null; this.src='${placeholderImage}';">
+                <div class="hotel-card-content">
+                    <h1 class="hotel-card-title-ko">${hotel.nameKo || '호텔명 없음'}</h1>
+                    ${hotel.nameEn ? `<h2 class="hotel-card-title-en">${hotel.nameEn}</h2>` : ''}
+                    ${hotel.description ? `<p class="hotel-card-description">${hotel.description.replace(/\n/g, '<br>')}</p>` : ''}
+                    ${hotel.mapLink ? `<a href="${hotel.mapLink}" target="_blank" rel="noopener noreferrer" class="hotel-card-link">지도 보기</a>` : ''}
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    const previewWindow = window.open('', '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes');
+    if (previewWindow) {
+        previewWindow.document.open();
+        previewWindow.document.write(previewHtml);
+        previewWindow.document.close();
+        previewWindow.focus();
+    } else {
+        alert('팝업 차단 기능이 활성화되어 미리보기를 열 수 없습니다. 팝업 차단을 해제해주세요.');
+    }
+}
 
 document.addEventListener('DOMContentLoaded', function () {
-    console.log("DOMContentLoaded: Script started."); // DOM 로드 완료 시점 로그
-
     // DOM 요소 참조 변수 할당
     hotelTabsContainer = document.getElementById('hotelTabsContainer');
     addHotelTabBtn = document.getElementById('addHotelTabBtn');
     hotelEditorForm = document.getElementById('hotelEditorForm');
-    // ... (다른 요소들 할당) ...
+    hotelNameKoInput = document.getElementById('hotelNameKo');
+    hotelNameEnInput = document.getElementById('hotelNameEn');
+    hotelMapLinkInput = document.getElementById('hotelMapLink');
+    hotelImageInput = document.getElementById('hotelImage');
+    hotelDescriptionInput = document.getElementById('hotelDescription');
     previewHotelBtn = document.getElementById('previewHotelBtn');
     saveHotelHtmlBtn = document.getElementById('saveHotelHtmlBtn');
     loadHotelHtmlBtn = document.getElementById('loadHotelHtmlBtn');
     loadHotelExcelBtn = document.getElementById('loadHotelExcelBtn');
     hotelHtmlLoadInput = document.getElementById('hotelHtmlLoadInput');
     hotelExcelLoadInput = document.getElementById('hotelExcelLoadInput');
-    
-    // 각 버튼 요소들이 제대로 찾아졌는지 확인
-    if (!addHotelTabBtn) console.error("Error: addHotelTabBtn not found!");
-    if (!previewHotelBtn) console.error("Error: previewHotelBtn not found!");
-    // 다른 주요 버튼들도 필요에 따라 확인 로그 추가 가능
 
     // 이벤트 리스너 연결
-    if (addHotelTabBtn) {
-        addHotelTabBtn.addEventListener('click', function() {
-            console.log("Button Clicked: Add New Hotel"); // 새 호텔 추가 버튼 클릭 로그
-            addHotel();
-        });
-    }
-    
-    if (previewHotelBtn) {
-        previewHotelBtn.addEventListener('click', function() {
-            console.log("Button Clicked: Preview Hotel"); // 미리보기 버튼 클릭 로그
-            previewHotelInfo();
-        });
-    }
+    if (addHotelTabBtn) addHotelTabBtn.addEventListener('click', addHotel); 
+    if (previewHotelBtn) previewHotelBtn.addEventListener('click', previewHotelInfo); 
 
-    // ... (다른 input 및 버튼들의 이벤트 리스너 연결) ...
-    // 예시: HTML 저장 버튼
+    [hotelNameKoInput, hotelNameEnInput, hotelMapLinkInput, hotelImageInput, hotelDescriptionInput].forEach(input => {
+        if (input) {
+            input.addEventListener('input', () => { 
+                syncCurrentHotelData(); 
+                if (input.id === 'hotelNameKo' && currentHotelIndex !== -1) {
+                    renderTabs(); 
+                }
+                if(input.value !== '') {
+                    input.placeholder = ' '; 
+                }
+            });
+        }
+    });
+
     if (saveHotelHtmlBtn) {
         saveHotelHtmlBtn.addEventListener('click', () => {
-            console.log("Button Clicked: Save HTML");
             syncCurrentHotelData(); 
             if (allHotelData.length === 0) {
                 alert('저장할 호텔 정보가 없습니다.');
@@ -102,10 +330,83 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ... (HTML 불러오기, Excel 불러오기 버튼 리스너에도 유사하게 로그 추가) ...
+    if (loadHotelHtmlBtn) loadHotelHtmlBtn.addEventListener('click', () => hotelHtmlLoadInput.click()); 
+    
+    if (hotelHtmlLoadInput) {
+        hotelHtmlLoadInput.addEventListener('change', (e) => { 
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const doc = new DOMParser().parseFromString(event.target.result, 'text/html');
+                    const dataScript = doc.getElementById('embeddedHotelData'); 
+                    if (dataScript && dataScript.textContent) {
+                        const loadedData = JSON.parse(dataScript.textContent); 
+                        if (Array.isArray(loadedData)) { 
+                            allHotelData = loadedData.map(hotel => ({ 
+                                nameKo: hotel.nameKo || "",
+                                nameEn: hotel.nameEn || "",
+                                mapLink: hotel.mapLink || "",
+                                image: hotel.image || "",
+                                description: hotel.description || ""
+                            }));
+                            switchTab(allHotelData.length > 0 ? 0 : -1); 
+                            alert('호텔 목록을 성공적으로 불러왔습니다.');
+                        } else { throw new Error('데이터 형식이 올바르지 않습니다.'); }
+                    } else { throw new Error('파일에서 호텔 데이터를 찾을 수 없습니다.'); }
+                } catch (err) { alert(`파일 처리 오류: ${err.message}`); }
+            };
+            reader.readAsText(file); 
+            e.target.value = ''; 
+        });
+    }
+    
+    if (loadHotelExcelBtn) {
+        loadHotelExcelBtn.addEventListener('click', () => {
+            if (currentHotelIndex === -1) { 
+                alert('엑셀 데이터를 적용할 호텔을 먼저 선택하거나 추가해주세요.');
+                return;
+            }
+            hotelExcelLoadInput.click(); 
+        });
+    }
+
+    if (hotelExcelLoadInput) {
+        hotelExcelLoadInput.addEventListener('change', (e) => { 
+            const file = e.target.files[0];
+            if (!file || currentHotelIndex === -1) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'}); 
+                    const hotelInfoSheet = workbook.Sheets[workbook.SheetNames[0]]; 
+                    const hotelJson = XLSX.utils.sheet_to_json(hotelInfoSheet, {header:1}); 
+                    if (hotelJson.length > 1) { 
+                        const hotelRow = hotelJson[1]; 
+                        const hotel = allHotelData[currentHotelIndex]; 
+                        hotel.nameKo = hotelRow[0] || hotel.nameKo;
+                        hotel.nameEn = hotelRow[1] || hotel.nameEn;
+                        hotel.mapLink = hotelRow[2] || hotel.mapLink; 
+                        hotel.image = hotelRow[3] || hotel.image;   
+                        hotel.description = hotelRow[4] || hotel.description; 
+                        renderEditorForCurrentHotel(); 
+                        renderTabs(); 
+                        alert(`'${hotel.nameKo}' 호텔 정보에 엑셀 데이터를 적용했습니다.`);
+                    } else {
+                        alert('엑셀 파일에 적용할 데이터가 충분하지 않습니다.');
+                    }
+                } catch (err) { alert(`엑셀 파일 처리 오류: ${err.message}`); }
+            };
+            reader.readAsArrayBuffer(file); 
+            e.target.value = ''; 
+        });
+    }
 
     // 초기화 호출
-    console.log("Initializing tabs with currentHotelIndex:", currentHotelIndex);
     switchTab(currentHotelIndex); 
-    console.log("DOMContentLoaded: Script finished initialization.");
 });
+</script>
+</body>
+</html>
