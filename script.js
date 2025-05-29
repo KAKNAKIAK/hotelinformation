@@ -1,12 +1,89 @@
 // 전역 상태 변수
 let allHotelData = [];
-let currentHotelIndex = -1; 
+let currentHotelIndex = -1;
 
 // DOM 요소 참조 변수 (DOMContentLoaded 내에서 할당)
 let hotelTabsContainer, addHotelTabBtn, hotelEditorForm;
 let hotelNameKoInput, hotelNameEnInput, hotelMapLinkInput, hotelImageInput, hotelDescriptionInput;
-let previewHotelBtn, saveHotelHtmlBtn, loadHotelHtmlBtn, loadHotelExcelBtn;
+let previewHotelBtn, saveHotelHtmlBtn, loadHotelHtmlBtn, loadHotelExcelBtn, savePreviewImageBtn; // savePreviewImageBtn 추가
 let hotelHtmlLoadInput, hotelExcelLoadInput;
+
+
+/**
+ * 미리보기 카드를 이미지 파일(PNG)로 저장합니다.
+ */
+async function savePreviewAsImage() {
+    syncCurrentHotelData();
+
+    if (currentHotelIndex === -1 || !allHotelData[currentHotelIndex]) {
+        alert('이미지로 저장할 호텔을 선택해주세요.');
+        return;
+    }
+
+    const hotel = allHotelData[currentHotelIndex];
+    const placeholderImage = 'https://placehold.co/600x400/e2e8f0/cbd5e0?text=No+Image';
+
+    // 1. 이미지 렌더링을 위한 보이지 않는 임시 컨테이너 생성 (위치 지정 방식 개선)
+    const offscreenContainer = document.createElement('div');
+    offscreenContainer.style.position = 'absolute';
+    offscreenContainer.style.left = '-9999px'; // 화면 왼쪽 밖으로 배치
+    offscreenContainer.style.width = '384px'; // 미리보기 카드와 동일한 너비 지정
+    document.body.appendChild(offscreenContainer);
+
+    // 2. 임시 컨테이너에 호텔 카드 HTML 삽입
+    const imageUrl = (typeof hotel.image === 'string' && hotel.image.startsWith('http')) ? hotel.image : placeholderImage;
+    const cardHtml = `
+        <div class="hotel-card">
+            <img id="temp-preview-img" src="${imageUrl}" crossorigin="anonymous" alt="${hotel.nameKo || '호텔 이미지'}" class="hotel-card-image">
+            <div class="hotel-card-content">
+                <h1 class="hotel-card-title-ko">${hotel.nameKo || '호텔명 없음'}</h1>
+                ${hotel.nameEn ? `<h2 class="hotel-card-title-en">${hotel.nameEn}</h2>` : ''}
+                ${hotel.description ? `<p class="hotel-card-description">${hotel.description.replace(/\n/g, '<br>')}</p>` : ''}
+                ${hotel.mapLink ? `<a href="#!" class="hotel-card-link">지도 보기</a>` : ''}
+            </div>
+        </div>
+    `;
+    offscreenContainer.innerHTML = cardHtml;
+    const cardToRender = offscreenContainer.querySelector('.hotel-card');
+    const imageToLoad = offscreenContainer.querySelector('#temp-preview-img');
+
+    // 3. 이미지가 완전히 로드될 때까지 대기
+    await new Promise((resolve) => {
+        imageToLoad.onload = resolve;
+        imageToLoad.onerror = () => {
+            imageToLoad.src = placeholderImage;
+        };
+        if (imageToLoad.complete) {
+            resolve();
+        }
+    });
+
+    // 4. html2canvas를 사용하여 카드를 이미지로 변환
+    try {
+        const canvas = await html2canvas(cardToRender, {
+            useCORS: true,
+            scale: 2,
+            // ★★★★★ 해결의 핵심 ★★★★★
+            // 캔버스 배경을 명시적으로 흰색으로 설정하여 검은 화면 문제 해결
+            backgroundColor: '#ffffff',
+        });
+        
+        // 5. 생성된 이미지를 다운로드
+        const link = document.createElement('a');
+        const fileName = (hotel.nameKo || 'hotel-preview').replace(/ /g, '_');
+        link.download = `${fileName}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+    } catch (err) {
+        console.error('이미지 생성 오류:', err);
+        alert('이미지를 생성하지 못했습니다. 외부 이미지의 CORS 정책 문제일 수 있습니다. (https 사용 이미지 권장)');
+    } finally {
+        // 6. 임시 컨테이너 제거
+        document.body.removeChild(offscreenContainer);
+    }
+}
+
 
 /**
  * 현재 호텔 데이터(allHotelData)를 기반으로 탭 UI를 다시 그립니다.
@@ -143,7 +220,6 @@ function deleteHotel(indexToDelete) {
         newActiveIndex = currentHotelIndex - 1;
     }
     
-    // 최종 인덱스 보정
     if (newActiveIndex >= allHotelData.length) {
         newActiveIndex = allHotelData.length - 1;
     }
@@ -209,12 +285,14 @@ document.addEventListener('DOMContentLoaded', function () {
     saveHotelHtmlBtn = document.getElementById('saveHotelHtmlBtn');
     loadHotelHtmlBtn = document.getElementById('loadHotelHtmlBtn');
     loadHotelExcelBtn = document.getElementById('loadHotelExcelBtn');
+    savePreviewImageBtn = document.getElementById('savePreviewImageBtn'); // 버튼 참조 추가
     hotelHtmlLoadInput = document.getElementById('hotelHtmlLoadInput');
     hotelExcelLoadInput = document.getElementById('hotelExcelLoadInput');
 
     // 이벤트 리스너 연결
     if (addHotelTabBtn) addHotelTabBtn.addEventListener('click', addHotel); 
-    if (previewHotelBtn) previewHotelBtn.addEventListener('click', previewHotelInfo); 
+    if (previewHotelBtn) previewHotelBtn.addEventListener('click', previewHotelInfo);
+    if (savePreviewImageBtn) savePreviewImageBtn.addEventListener('click', savePreviewAsImage); // 이벤트 리스너 연결
 
     [hotelNameKoInput, hotelNameEnInput, hotelMapLinkInput, hotelImageInput, hotelDescriptionInput].forEach(input => {
         if (input) {
@@ -308,7 +386,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     const hotelInfoSheet = workbook.Sheets[sheetName]; 
                     const hotelJson = XLSX.utils.sheet_to_json(hotelInfoSheet, {header:1}); 
 
-                    // 데이터는 2번째 행(index 1)에 있어야 함
                     if (hotelJson.length < 2 || !Array.isArray(hotelJson[1]) || hotelJson[1].every(cell => cell === null || cell === '')) { 
                         throw new Error('엑셀 파일 두 번째 행에 유효한 데이터가 없습니다. A2, B2 등에 정보를 입력해주세요.');
                     }
@@ -316,7 +393,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     const hotelRow = hotelJson[1]; 
                     const hotel = allHotelData[currentHotelIndex]; 
                     
-                    // 각 셀의 데이터가 존재할 경우에만 기존 정보를 덮어씀
                     hotel.nameKo = hotelRow[0] || hotel.nameKo;
                     hotel.nameEn = hotelRow[1] || hotel.nameEn;
                     hotel.mapLink = hotelRow[2] || hotel.mapLink; 
