@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>호텔 카드 메이커 사용 설명서</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            background-color: #f8f9fa;
+            color: #343a40;
+            line-height: 1.7;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            background-color: #ffffff;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e9ecef;
+        }
+        h1, h2, h3 {
+            color: #2d3748;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+            margin-top: 2rem;
+            margin-bottom: 1.5rem;
+        }
+        h1 {
+            font-size: 2rem;
+            text-align: center;
+            border-bottom: none;
+        }
+        h2 {
+            font-size: 1.5rem;
+        }
+        h3 {
+            font-size: 1.2rem;
+            border-bottom-style: dashed;
+        }
+        code {
+            background-color: #e2e8f0;
+            color: #2d3748;
+            padding: 0.2em 0.5em;
+            border-radius: 0.3rem;
+            font-weight: 600;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        ol, ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 0.75rem;
+        }
+        .note {
+            background-color: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 0.25rem;
+        }
+        .note strong {
+            color: #856404;
+        }
+        .guide-image {
+            max-width: 100%;
+            height: auto;
+            margin-top: 15px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>호텔 카드 메이커: 쉬운 사용 설명서</h1>
+        
+        <section id="intro">
+            <h2>이 프로그램은 무엇인가요?</h2>
+            <p>이메일이나 웹페이지에 사용할 수 있는 깔끔한 호텔 안내 카드를 쉽고 빠르게 만드는 도구입니다.</p>
+        </section>
+
+        <section id="getting-started">
+            <h2>시작하기: 3단계로 카드 만들기</h2>
+            <ol>
+                <li><strong>새 카드 추가하기</strong><br>
+                    <code>+ 새 호텔 추가</code> 버튼을 누르면, '새 호텔 1'이라는 이름의 탭이 새로 생깁니다.</li>
+                <li><strong>호텔 정보 입력하기</strong><br>
+                    새로 생긴 탭이 선택된 상태에서, 아래쪽에 있는 빈칸에 호텔 정보를 채워 넣으세요.
+                    <ul>
+                        <li><strong>호텔명 (한글/영문)</strong>: 호텔의 한글, 영문 이름을 적습니다.</li>
+                        <li><strong>호텔 웹사이트</strong>: 호텔 홈페이지 주소를 넣으면, 카드에 '웹사이트 바로가기' 버튼이 생깁니다.</li>
+                        <li><strong>대표 이미지 URL</strong>: 카드에 보여줄 호텔 사진의 인터넷 주소를 입력합니다.</li>
+                        <li><strong>간단 설명</strong>: 호텔의 특징을 한 줄씩 입력하세요. 한 줄 쓰고 엔터(Enter)를 치면, 나중에 자동으로 보기 좋은 목록으로 만들어 줍니다.</li>
+                    </ul>
+                </li>
+                <li><strong>미리보기로 확인하기</strong><br>
+                    오른쪽 위에 있는 <code>미리보기</code> 버튼을 누르면, 실제 카드가 어떻게 보이는지 새 창에서 바로 확인할 수 있습니다. 여러 호텔을 만들었다면 슬라이드 형태로 나타납니다.</li>
+            </ol>
+        </section>
+
+        <section id="usage">
+            <h2>만든 카드는 어떻게 사용하나요?</h2>
+            <p>목적에 따라 두 가지 방법으로 카드를 활용할 수 있습니다.</p>
+
+            <h3>방법 1: 견적 메일(인보이스)에 바로 붙여넣고 싶을 때</h3>
+            <ol>
+                <li>견적서에 추가하려는 호텔의 탭을 클릭해서 선택하세요.</li>
+                <li><code>코드 복사</code> 버튼을 누릅니다.</li>
+                <li>견적 메일 보내기 화면으로 이동하여, 입력창의 편집기(Editor) 모드를 <strong>'HTML'로 변경</strong>합니다.</li>
+                <li>HTML 모드로 바뀐 입력창에 복사된 코드를 <strong>붙여넣기(Ctrl+V)</strong> 하면 카드가 나타납니다.</li>
+            </ol>
+            <img src="https://www.naeiltour.co.kr/images/web/220529.png" alt="내일투어 안내 이미지" class="guide-image">
+
+            <h3>방법 2: 안내문 파일로 전달하고 싶을 때</h3>
+            <ol>
+                <li><code>HTML 저장</code> 버튼을 누르세요.</li>
+                <li>지금까지 만들었던 모든 호텔 카드가 각각 하나의 <strong>웹페이지 파일(.html)로</strong> 컴퓨터에 저장됩니다.</li>
+                <li>이 파일을 다른 사람에게 보내면, 파일을 열어 호텔 안내 카드를 확인할 수 있습니다.</li>
+            </ol>
+        </section>
+
+        <section id="save-load">
+            <h2>작업 내용을 저장하고 다음에 이어서 하려면?</h2>
+            <ul>
+                <li><strong>작업 내용 저장하기:</strong> <code>데이터 저장</code><br>
+                    지금까지 작업한 모든 내용을 '편집용 백업 파일'로 저장합니다. 나중에 이어서 수정하고 싶을 때 사용하세요.</li>
+                <li><strong>저장한 내용 불러오기:</strong> <code>데이터 불러오기</code><br>
+                    전에 <code>데이터 저장</code>으로 만들어 둔 '편집용 백업 파일'을 선택하면, 작업했던 내용이 화면에 그대로 복원됩니다.</li>
+            </ul>
+            <div class="note">
+                <strong>주의!</strong><br>
+                <code>HTML 저장</code>은 다른 사람에게 보여줄 **완성된 결과물**을 만드는 기능이고,<br>
+                <code>데이터 저장</code>은 나중에 내가 다시 수정하기 위한 **작업 과정**을 백업하는 기능입니다.
+            </div>
+        </section>
+
+        <section id="faq">
+            <h2>자주 묻는 질문 (FAQ)</h2>
+            <dl>
+                <dt><strong>Q. 왜 정보 입력 칸이 회색이고 글자가 안 써지나요?</strong></dt>
+                <dd>A. <code>+ 새 호텔 추가</code> 버튼을 눌러 새 카드를 만들거나, 기존에 만들어둔 호텔 탭 중 하나를 먼저 클릭해야 정보 입력 칸이 활성화됩니다.</dd>
+                <br>
+                <dt><strong>Q. <code>미리보기</code>를 눌렀는데 아무 반응이 없어요.</strong></dt>
+                <dd>A. 인터넷 브라우저가 팝업 창을 차단했을 가능성이 높습니다. 주소창 주변에 나타나는 팝업 차단 알림을 확인하고 '팝업 허용'을 선택해 주세요.</dd>
+            </dl>
+        </section>
+    </div>
+
+</body>
+</html>
