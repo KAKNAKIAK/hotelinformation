@@ -16,7 +16,27 @@ let hotelHtmlLoadInput;
  * @returns {string} - 호텔 카드의 HTML 문자열
  */
 function generateHotelCardHtml(hotel, options = {}) {
-    const { forImage = false } = options; 
+    const isImageOnly = hotel.image && !hotel.nameKo && !hotel.nameEn && !hotel.description && !hotel.website;
+
+    // 이미지 URL만 단독으로 입력된 경우, 이미지만 출력하는 로직
+    if (isImageOnly) {
+        const placeholderImage = 'https://placehold.co/640x480/e2e8f0/cbd5e0?text=Invalid+Image+URL';
+        const currentHotelImage = (typeof hotel.image === 'string' && hotel.image.startsWith('http')) ? hotel.image : placeholderImage;
+        return `
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 750px; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;">
+            <tbody>
+              <tr>
+                <td style="text-align: center; padding: 24px;">
+                  <img src="${currentHotelImage}" alt="제공된 이미지" style="width: 640px; max-width: 100%; height: auto; display: block; margin: 0 auto;" onerror="this.onerror=null; this.src='${placeholderImage}';">
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+    }
+
+    // 기존의 호텔 정보 카드 생성 로직
+    const { forImage = false } = options;
 
     const placeholderImage = 'https://placehold.co/400x300/e2e8f0/cbd5e0?text=No+Image';
     const currentHotelImage = (typeof hotel.image === 'string' && hotel.image.startsWith('http')) ? hotel.image : placeholderImage;
@@ -393,7 +413,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const dataScript = doc.getElementById('embeddedHotelData');
                     if (!dataScript || !dataScript.textContent) throw new Error('파일에서 호텔 데이터를 찾을 수 없습니다.');
                     const loadedData = JSON.parse(dataScript.textContent);
-                    if (!Array.isArray(loadedData)) throw new Error('데이터 형식이 올바르지 않습니다 (배열이 아님).');
+                    if (!Array.isArray(loadedData)) throw new Error('데이터 형식이 올바지 않습니다 (배열이 아님).');
                     const newHotels = loadedData.map(hotel => ({ nameKo: hotel.nameKo || "", nameEn: hotel.nameEn || "", website: hotel.website || "", image: hotel.image || "", description: hotel.description || "" }));
                     allHotelData.push(...newHotels);
                     switchTab(allHotelData.length - 1);
