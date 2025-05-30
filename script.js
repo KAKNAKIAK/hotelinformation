@@ -268,10 +268,6 @@ function deleteHotel(indexToDelete) {
     if (indexToDelete < 0 || indexToDelete >= allHotelData.length) return;
     const hotelName = allHotelData[indexToDelete].nameKo || '이 호텔';
     if (!confirm(`'${hotelName}' 정보를 삭제하시겠습니까?`)) return;
-
-    if (currentHotelIndex === indexToDelete) {
-        // syncCurrentHotelData(); // No need to sync if deleting current, form will be cleared or repopulated
-    }
     
     allHotelData.splice(indexToDelete, 1);
     
@@ -307,8 +303,53 @@ function syncCurrentHotelData() {
     hotel.description = hotelDescriptionInput.value.trim();
 }
 
+// ===================================================================================
+// START: 엑셀 데이터 붙여넣기 기능 수정 (TSV 파싱 개선)
+// ===================================================================================
+
+/**
+ * TSV 텍스트를 파싱하여 실제 행(row) 단위로 분리합니다.
+ * 큰따옴표로 감싸진 필드 내의 줄바꿈은 행 분리 기준으로 보지 않습니다.
+ * (주의: 이 함수는 간단한 TSV 형식에 맞춰져 있으며, 모든 CSV/TSV 엣지 케이스를 완벽히 처리하지 못할 수 있습니다.)
+ * @param {string} text - 전체 TSV 텍스트
+ * @returns {string[]} - 실제 행들의 배열
+ */
+function splitTsvRows(text) {
+    const rows = [];
+    let currentRowStart = 0;
+    let inQuotes = false;
+
+    // 원본 텍스트의 \r\n 을 \n으로 통일하고, \r만 있는 경우도 \n으로 변경 (일관성 유지)
+    const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    for (let i = 0; i < normalizedText.length; i++) {
+        const char = normalizedText[i];
+        if (char === '"') {
+            // 매우 기본적인 따옴표 처리: 따옴표 쌍이 필드를 감싸는 경우를 위주로 함
+            // TODO: 필드 내부에 "" 형태로 이스케이프된 따옴표가 있는 경우 더 정교한 처리가 필요할 수 있음
+            inQuotes = !inQuotes;
+        }
+        if (char === '\n' && !inQuotes) {
+            rows.push(normalizedText.substring(currentRowStart, i).trim()); // trim()으로 각 행의 앞뒤 공백 제거
+            currentRowStart = i + 1;
+        }
+    }
+    // 마지막 행 추가
+    rows.push(normalizedText.substring(currentRowStart).trim());
+    return rows.filter(row => row.length > 0); // 내용이 있는 행만 반환
+}
+
+
+/**
+ * TSV (Tab Separated Values) 형식의 텍스트 데이터를 파싱하여 호텔 정보를 가져옵니다.
+ * 옵션 1 적용: 현재 선택된 호텔 덮어쓰기 후, 나머지는 뒤에 새 탭으로 추가.
+ * @param {string} tsvData - 탭으로 구분된 호텔 정보 텍스트.
+ * @returns {object} - { importedCount: number, errors: string[], affectedIndex: number }
+ */
 function importHotelsFromTSV(tsvData) {
-    const lines = tsvData.trim().split('\n').filter(line => line.trim() !== ""); 
+    // 개선된 행 분리 로직 사용
+    const lines = splitTsvRows(tsvData);
+
     if (lines.length === 0) {
         return { importedCount: 0, errors: [], affectedIndex: currentHotelIndex };
     }
@@ -317,15 +358,29 @@ function importHotelsFromTSV(tsvData) {
     const errors = []; 
     let affectedIndex = currentHotelIndex; 
 
+    // 각 필드 값에서 앞뒤 따옴표 제거하는 헬퍼 함수
+    function cleanFieldValue(value) {
+        if (typeof value !== 'string') return "";
+        let cleanedValue = value.trim();
+        // 앞뒤 쌍따옴표 제거 (예: "내용" -> 내용)
+        if (cleanedValue.startsWith('"') && cleanedValue.endsWith('"')) {
+            cleanedValue = cleanedValue.substring(1, cleanedValue.length - 1);
+            // 따옴표 제거 후, 내부의 이스케이프된 따옴표 ("")를 단일 따옴표 (")로 변환 (필요시)
+            // cleanedValue = cleanedValue.replace(/""/g, '"'); // 현재 예시에서는 불필요하나, 일반적 TSV를 위해 고려
+        }
+        return cleanedValue;
+    }
+
     if (currentHotelIndex !== -1 && allHotelData[currentHotelIndex] && lines.length > 0) {
-        const firstLineColumns = lines[0].split('\t');
+        const firstLineColumnsRaw = lines[0].split('\t');
+        const firstLineColumns = firstLineColumnsRaw.map(cleanFieldValue); // 각 필드 정리
         const hotelToUpdate = allHotelData[currentHotelIndex];
         
         hotelToUpdate.nameKo = firstLineColumns[0] || "";
         hotelToUpdate.nameEn = firstLineColumns[1] || "";
         hotelToUpdate.website = firstLineColumns[2] || "";
         hotelToUpdate.image = firstLineColumns[3] || "";
-        hotelToUpdate.description = firstLineColumns[4] || "";
+        hotelToUpdate.description = firstLineColumns[4] || ""; // 이미 cleanFieldValue에서 처리됨
         importedCount++;
         affectedIndex = currentHotelIndex; 
 
@@ -333,7 +388,8 @@ function importHotelsFromTSV(tsvData) {
             const remainingLines = lines.slice(1);
             const newHotelsToInsert = [];
             remainingLines.forEach((line) => {
-                const columns = line.split('\t');
+                const columnsRaw = line.split('\t');
+                const columns = columnsRaw.map(cleanFieldValue); // 각 필드 정리
                 newHotelsToInsert.push({
                     nameKo: columns[0] || "",
                     nameEn: columns[1] || "",
@@ -348,7 +404,8 @@ function importHotelsFromTSV(tsvData) {
     } else {
         affectedIndex = allHotelData.length; 
         lines.forEach((line) => {
-            const columns = line.split('\t');
+            const columnsRaw = line.split('\t');
+            const columns = columnsRaw.map(cleanFieldValue); // 각 필드 정리
             allHotelData.push({
                 nameKo: columns[0] || "",
                 nameEn: columns[1] || "",
@@ -358,11 +415,16 @@ function importHotelsFromTSV(tsvData) {
             });
             importedCount++;
         });
-        if (importedCount === 0) affectedIndex = -1; 
+        if (importedCount === 0 && allHotelData.length === 0) affectedIndex = -1;
+        else if (importedCount === 0 && allHotelData.length > 0) affectedIndex = currentHotelIndex; // 변경 없음
     }
 
     return { importedCount, errors, affectedIndex };
 }
+// ===================================================================================
+// END: 엑셀 데이터 붙여넣기 기능 수정
+// ===================================================================================
+
 
 document.addEventListener('DOMContentLoaded', function () {
     hotelTabsContainer = document.getElementById('hotelTabsContainer');
@@ -489,7 +551,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (hotelEditorForm) {
         hotelEditorForm.addEventListener('paste', function(event) {
             const pastedText = (event.clipboardData || window.clipboardData).getData('text/plain');
-            // 수정된 감지 로직: 탭 문자만 있어도 TSV로 간주 (단일 행 복사 지원)
             const isTSVLike = pastedText.includes('\t'); 
 
             if (isTSVLike) {
