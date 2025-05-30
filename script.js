@@ -243,15 +243,13 @@ function renderEditorForCurrentHotel() {
 
 function switchTab(index) {
     if (index < -1 || (index >= allHotelData.length && allHotelData.length > 0)) {
-      // 만약 index가 범위를 벗어나고 데이터가 있다면, 유효한 마지막 index로 조정
       if (allHotelData.length > 0) {
         index = allHotelData.length -1;
       } else {
-        index = -1; // 데이터가 없으면 -1로
+        index = -1; 
       }
     }
 
-    // 현재 탭의 데이터를 저장 (currentHotelIndex가 유효하고, 다른 탭으로 이동하는 경우)
     if (currentHotelIndex !== -1 && currentHotelIndex < allHotelData.length && currentHotelIndex !== index) {
         syncCurrentHotelData();
     }
@@ -271,37 +269,32 @@ function deleteHotel(indexToDelete) {
     const hotelName = allHotelData[indexToDelete].nameKo || '이 호텔';
     if (!confirm(`'${hotelName}' 정보를 삭제하시겠습니까?`)) return;
 
-    // 삭제 전에 현재 탭의 데이터를 동기화 (만약 삭제하려는 탭이 현재 탭이라면)
     if (currentHotelIndex === indexToDelete) {
-        syncCurrentHotelData(); // 삭제될 탭의 마지막 상태 저장 시도 (필수는 아님)
+        // syncCurrentHotelData(); // No need to sync if deleting current, form will be cleared or repopulated
     }
     
     allHotelData.splice(indexToDelete, 1);
     
-    let newActiveIndex = -1; // 기본값: 호텔이 없으면 비활성화
+    let newActiveIndex = -1; 
 
-    if (allHotelData.length > 0) { // 남은 호텔이 있다면
-        if (currentHotelIndex === indexToDelete) { // 현재 활성화된 탭이 삭제된 경우
-            newActiveIndex = Math.max(0, indexToDelete - 1); // 이전 탭을 선택하거나, 첫번째 탭 선택
-        } else if (currentHotelIndex > indexToDelete) { // 삭제된 탭보다 뒤에 있는 탭이 활성화된 경우
-            newActiveIndex = currentHotelIndex - 1; // 인덱스 하나 감소
-        } else { // 삭제된 탭보다 앞에 있는 탭이 활성화된 경우
-            newActiveIndex = currentHotelIndex; // 인덱스 변경 없음
+    if (allHotelData.length > 0) { 
+        if (currentHotelIndex === indexToDelete) { 
+            newActiveIndex = Math.max(0, indexToDelete - 1); 
+        } else if (currentHotelIndex > indexToDelete) { 
+            newActiveIndex = currentHotelIndex - 1; 
+        } else { 
+            newActiveIndex = currentHotelIndex; 
         }
-        // newActiveIndex가 배열 범위를 벗어나지 않도록 조정
         newActiveIndex = Math.min(newActiveIndex, allHotelData.length - 1);
     }
     
     switchTab(newActiveIndex);
 }
 
-// syncCurrentHotelData 함수 수정: 조건문 간결화
 function syncCurrentHotelData() {
-    // currentHotelIndex가 유효하지 않거나, 해당 호텔 데이터가 없으면 동기화하지 않음
     if (currentHotelIndex === -1 || !allHotelData[currentHotelIndex]) {
         return;
     }
-    // 입력 필드가 모두 존재하는지 확인 (초기화 중 오류 방지)
     if (!hotelNameKoInput || !hotelNameEnInput || !hotelWebsiteInput || !hotelImageInput || !hotelDescriptionInput) {
         return;
     }
@@ -314,29 +307,17 @@ function syncCurrentHotelData() {
     hotel.description = hotelDescriptionInput.value.trim();
 }
 
-
-// ===================================================================================
-// START: 엑셀 데이터 붙여넣기 기능 수정 (옵션 1 적용)
-// ===================================================================================
-/**
- * TSV (Tab Separated Values) 형식의 텍스트 데이터를 파싱하여 호텔 정보를 가져옵니다.
- * 옵션 1 적용: 현재 선택된 호텔 덮어쓰기 후, 나머지는 뒤에 새 탭으로 추가.
- * @param {string} tsvData - 탭으로 구분된 호텔 정보 텍스트.
- * @returns {object} - { importedCount: number, errors: string[], affectedIndex: number }
- */
 function importHotelsFromTSV(tsvData) {
-    const lines = tsvData.trim().split('\n').filter(line => line.trim() !== ""); // 비어있지 않은 줄만 처리
+    const lines = tsvData.trim().split('\n').filter(line => line.trim() !== ""); 
     if (lines.length === 0) {
         return { importedCount: 0, errors: [], affectedIndex: currentHotelIndex };
     }
 
     let importedCount = 0;
-    const errors = []; // 오류 메시지 배열 (현재는 사용되지 않으나 확장성 위해 유지)
-    let affectedIndex = currentHotelIndex; // 작업 후 활성화할 탭 인덱스
+    const errors = []; 
+    let affectedIndex = currentHotelIndex; 
 
     if (currentHotelIndex !== -1 && allHotelData[currentHotelIndex] && lines.length > 0) {
-        // 현재 선택된 호텔(탭)이 있고, 붙여넣을 데이터가 있는 경우:
-        // 옵션 1: 첫 번째 줄 데이터로 현재 호텔 정보 덮어쓰기
         const firstLineColumns = lines[0].split('\t');
         const hotelToUpdate = allHotelData[currentHotelIndex];
         
@@ -346,9 +327,8 @@ function importHotelsFromTSV(tsvData) {
         hotelToUpdate.image = firstLineColumns[3] || "";
         hotelToUpdate.description = firstLineColumns[4] || "";
         importedCount++;
-        affectedIndex = currentHotelIndex; // 덮어쓴 탭을 활성 탭으로 유지
+        affectedIndex = currentHotelIndex; 
 
-        // 나머지 줄 데이터가 있다면, 현재 호텔 다음에 새 호텔로 삽입
         if (lines.length > 1) {
             const remainingLines = lines.slice(1);
             const newHotelsToInsert = [];
@@ -362,14 +342,11 @@ function importHotelsFromTSV(tsvData) {
                     description: columns[4] || ""
                 });
             });
-            // splice를 사용하여 현재 호텔 바로 다음에 삽입
             allHotelData.splice(currentHotelIndex + 1, 0, ...newHotelsToInsert);
             importedCount += newHotelsToInsert.length;
         }
     } else {
-        // 현재 선택된 호텔이 없거나 (currentHotelIndex === -1), 붙여넣을 데이터만 있는 경우:
-        // 모든 줄을 새 호텔로 맨 뒤에 추가
-        affectedIndex = allHotelData.length; // 새로 추가될 첫번째 호텔의 인덱스
+        affectedIndex = allHotelData.length; 
         lines.forEach((line) => {
             const columns = line.split('\t');
             allHotelData.push({
@@ -381,15 +358,11 @@ function importHotelsFromTSV(tsvData) {
             });
             importedCount++;
         });
-        if (importedCount === 0) affectedIndex = -1; // 아무것도 추가 안됐으면 -1
+        if (importedCount === 0) affectedIndex = -1; 
     }
 
     return { importedCount, errors, affectedIndex };
 }
-// ===================================================================================
-// END: 엑셀 데이터 붙여넣기 기능 수정
-// ===================================================================================
-
 
 document.addEventListener('DOMContentLoaded', function () {
     hotelTabsContainer = document.getElementById('hotelTabsContainer');
@@ -513,21 +486,16 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ===================================================================================
-    // START: 엑셀 데이터 붙여넣기 이벤트 리스너 수정 (옵션 1 적용)
-    // ===================================================================================
     if (hotelEditorForm) {
         hotelEditorForm.addEventListener('paste', function(event) {
             const pastedText = (event.clipboardData || window.clipboardData).getData('text/plain');
-            const isTSVLike = pastedText.includes('\t') && pastedText.includes('\n');
+            // 수정된 감지 로직: 탭 문자만 있어도 TSV로 간주 (단일 행 복사 지원)
+            const isTSVLike = pastedText.includes('\t'); 
 
             if (isTSVLike) {
                 if (confirm('엑셀/표 형식의 데이터를 붙여넣어 호텔 정보를 처리하시겠습니까?\n(선택된 호텔이 있으면 첫 줄로 덮어쓰고 나머지는 뒤에 추가, 없으면 모두 새 호텔로 추가됩니다.)')) {
                     event.preventDefault(); 
-
-                    // 붙여넣기 전, 현재 활성화된 탭의 입력 내용을 먼저 동기화
                     syncCurrentHotelData();
-
                     const result = importHotelsFromTSV(pastedText);
 
                     if (result.importedCount > 0) {
@@ -536,15 +504,15 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (result.affectedIndex !== -1 && result.affectedIndex < allHotelData.length) {
                             switchTab(result.affectedIndex);
                         } else if (allHotelData.length > 0) {
-                            switchTab(0); // 만약 affectedIndex가 유효하지 않으면 첫번째 탭으로
+                            switchTab(0); 
                         } else {
-                            switchTab(-1); // 데이터가 전혀 없으면 비활성화
+                            switchTab(-1); 
                         }
                     } else {
                         alert('붙여넣은 데이터에서 유효한 호텔 정보를 찾을 수 없거나, 형식이 맞지 않습니다.');
                     }
 
-                    if (result.errors.length > 0) { // errors 배열은 현재는 비어있지만, 추후 활용 가능
+                    if (result.errors.length > 0) { 
                         console.warn("Import errors:\n" + result.errors.join("\n"));
                         alert(`가져오기 중 ${result.errors.length}개의 항목에서 오류가 발생했습니다. 자세한 내용은 개발자 콘솔을 확인하세요.`);
                     }
@@ -552,25 +520,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-    // ===================================================================================
-    // END: 엑셀 데이터 붙여넣기 이벤트 리스너 수정
-    // ===================================================================================
 
-    // ===================================================================================
-    // START: 초기 로드 시 호텔 데이터 없으면 기본 호텔 추가 (첫 번째 요청)
-    // ===================================================================================
     if (allHotelData.length === 0) {
-        addHotel(); // 기본 호텔 1개 추가 및 활성화
+        addHotel(); 
     } else {
-        // 데이터가 이미 있다면, 첫 번째 탭을 기본으로 활성화 (또는 마지막 작업 상태 복원 로직이 있다면 그에 따름)
-        // 현재는 currentHotelIndex가 -1이므로, 첫 번째 탭을 활성화하도록 명시적 호출
         if(currentHotelIndex === -1 && allHotelData.length > 0) {
             switchTab(0);
         } else {
-            switchTab(currentHotelIndex); // 기존 로직 유지 (예: 페이지 새로고침 시 마지막 상태 복원)
+            switchTab(currentHotelIndex); 
         }
     }
-    // ===================================================================================
-    // END: 초기 로드 시 호텔 데이터 없으면 기본 호텔 추가
-    // ===================================================================================
 });
