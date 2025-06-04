@@ -58,6 +58,7 @@ body {
 .btn-load-excel:hover { background-color: #38a169; }
 .btn-preview { background-color: #805ad5; }
 .btn-preview:hover { background-color: #6b46c1; }
+.btn-manual {background-color: #6c757d;  color: white; }
 
 #hotelTabsContainer {
     display: flex;
