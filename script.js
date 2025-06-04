@@ -1,13 +1,52 @@
 // 전역 상태 변수
 let allHotelData = [];
 let currentHotelIndex = -1;
+let currentHotelDocumentId = null; // 현재 작업 중인 Firestore 문서 ID
+let currentHotelDocumentName = "새 호텔 정보 모음"; // 현재 작업 중인 문서의 표시 이름
+let allFetchedHotelSets = []; // Firestore에서 가져온 호텔 정보 세트 목록
 
-// DOM 요소 참조 변수
+// DOM 요소 참조 변수 (기존 + 모달용)
 let hotelTabsContainer, addHotelTabBtn, hotelEditorForm;
 let hotelNameKoInput, hotelNameEnInput, hotelWebsiteInput, hotelImageInput, hotelDescriptionInput;
 let previewHotelBtn, saveHotelHtmlBtn, loadHotelHtmlBtn, savePreviewHtmlBtn, copyHtmlBtn, manualBtn;
-let hotelHtmlLoadInput;
+let currentDocumentNameDisplay; // H2 제목 옆에 현재 문서 이름 표시용
 
+// 모달 관련 DOM 요소
+let loadHotelSetModal, hotelSetSearchInput, hotelSetListForLoad, loadingHotelSetListMsg, cancelLoadHotelSetModalButton, closeLoadHotelSetModalButton;
+
+
+// Firebase 설정 (hotelinformation-app 용)
+const firebaseConfig = {
+  apiKey: "AIzaSyDsV5PGKMFdCDKgFfl077-DuaYv6N5kVNs",
+  authDomain: "hotelinformation-app.firebaseapp.com",
+  projectId: "hotelinformation-app",
+  storageBucket: "hotelinformation-app.firebasestorage.app",
+  messagingSenderId: "1027315001739",
+  appId: "1:1027315001739:web:d7995a67062441fa93a78e",
+  measurementId: "G-X889T0FZCY"
+};
+
+// Firebase 앱 초기화
+if (typeof firebase !== 'undefined') {
+    firebase.initializeApp(firebaseConfig);
+} else {
+    console.error("Firebase SDK가 로드되지 않았습니다. index.html 파일의 스크립트 로드 순서를 확인해주세요.");
+    alert("Firebase SDK 로드 실패. 일부 기능이 작동하지 않을 수 있습니다.");
+}
+
+const db = typeof firebase !== 'undefined' ? firebase.firestore() : null;
+if (!db && typeof firebase !== 'undefined') {
+    console.error("Firestore 인스턴스를 초기화할 수 없습니다. Firebase SDK (특히 firestore.js) 로드 상태를 확인해주세요.");
+    alert("Firestore 초기화 실패. 데이터 저장/불러오기 기능이 작동하지 않을 수 있습니다.");
+}
+const serverTimestamp = typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null;
+
+
+// Toast 메시지 함수 (간단 버전)
+function showToastMessage(message, isError = false) {
+    console.log(`Toast: ${message} (Error: ${isError})`);
+    alert(message); // 실제 프로덕션에서는 더 나은 UI의 Toast 사용 권장
+}
 
 /**
  * 호텔 카드 1개에 대한 HTML 코드를 생성하는 헬퍼 함수
@@ -42,7 +81,7 @@ function generateHotelCardHtml(hotel, options = {}) {
     const descriptionHtml = descriptionItems.map(item => {
         return `
             <div style="margin-bottom: 6px; line-height: 1.6;">
-                <span style="font-size: 14px; color: #34495e; vertical-align: middle;">${item.replace(/● /g, '')}</span>
+                <span style="font-size: 12px; color: #34495e; vertical-align: middle;">${item.replace(/● /g, '')}</span>
             </div>
         `;
     }).join('');
@@ -99,11 +138,15 @@ function generateFullPreviewHtml(data) {
     `;
     const sliderBodyScript = `
         <script>
-            const swiper = new Swiper('.swiper', {
-                loop: true,
-                pagination: { el: '.swiper-pagination', clickable: true },
-                navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
-            });
+            if (typeof Swiper !== 'undefined') {
+                const swiper = new Swiper('.swiper', {
+                    loop: true,
+                    pagination: { el: '.swiper-pagination', clickable: true },
+                    navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+                });
+            } else {
+                console.warn('Swiper library not loaded for preview. Make sure Swiper JS is included in index.html.');
+            }
         </script>
     `;
     let bodyContent;
@@ -158,7 +201,7 @@ function generateFullPreviewHtml(data) {
 }
 
 function copyOptimizedHtml() {
-    if (currentHotelIndex === -1) {
+    if (currentHotelIndex === -1 || currentHotelIndex >= allHotelData.length) {
         alert('먼저 복사할 호텔 탭을 선택해주세요.');
         return;
     }
@@ -194,6 +237,11 @@ function renderTabs() {
     if (!hotelTabsContainer || !addHotelTabBtn) return;
     const existingTabs = hotelTabsContainer.querySelectorAll('.hotel-tab-button:not(#addHotelTabBtn)');
     existingTabs.forEach(tab => tab.remove());
+
+    if (currentDocumentNameDisplay) {
+        currentDocumentNameDisplay.textContent = `(${currentHotelDocumentName || "저장되지 않음"})`;
+    }
+
     allHotelData.forEach((hotel, index) => {
         const tabButton = document.createElement('button');
         tabButton.className = 'hotel-tab-button';
@@ -216,7 +264,7 @@ function renderTabs() {
 
 function renderEditorForCurrentHotel() {
     if (!hotelEditorForm || !hotelNameKoInput || !hotelNameEnInput || !hotelWebsiteInput || !hotelImageInput || !hotelDescriptionInput) return;
-    if (currentHotelIndex === -1 || !allHotelData[currentHotelIndex]) {
+    if (currentHotelIndex === -1 || currentHotelIndex >= allHotelData.length || !allHotelData[currentHotelIndex] ) {
         hotelEditorForm.classList.add('disabled');
         hotelNameKoInput.value = '';
         hotelNameEnInput.value = '';
@@ -242,23 +290,19 @@ function renderEditorForCurrentHotel() {
 }
 
 function switchTab(index) {
-    if (index < -1 || (index >= allHotelData.length && allHotelData.length > 0)) {
-      if (allHotelData.length > 0) {
-        index = allHotelData.length -1;
-      } else {
-        index = -1; 
-      }
+    if (allHotelData.length === 0) {
+        currentHotelIndex = -1;
+    } else if (index < 0 || index >= allHotelData.length) {
+        currentHotelIndex = 0;
+    } else {
+        currentHotelIndex = index;
     }
-
-    if (currentHotelIndex !== -1 && currentHotelIndex < allHotelData.length && currentHotelIndex !== index) {
-        syncCurrentHotelData();
-    }
-    currentHotelIndex = index;
     renderTabs();
     renderEditorForCurrentHotel();
 }
 
 function addHotel() {
+    syncCurrentHotelData();
     const newHotel = { nameKo: `새 호텔 ${allHotelData.length + 1}`, nameEn: "", website: "", image: "", description: "" };
     allHotelData.push(newHotel);
     switchTab(allHotelData.length - 1);
@@ -267,28 +311,27 @@ function addHotel() {
 function deleteHotel(indexToDelete) {
     if (indexToDelete < 0 || indexToDelete >= allHotelData.length) return;
     const hotelName = allHotelData[indexToDelete].nameKo || '이 호텔';
-    if (!confirm(`'${hotelName}' 정보를 삭제하시겠습니까?`)) return;
-    
-    allHotelData.splice(indexToDelete, 1);
-    
-    let newActiveIndex = -1; 
+    if (!confirm(`'${hotelName}' 정보를 현재 목록에서 삭제하시겠습니까? (저장된 내용은 Firebase에서 별도 삭제 필요)`)) return;
 
-    if (allHotelData.length > 0) { 
-        if (currentHotelIndex === indexToDelete) { 
-            newActiveIndex = Math.max(0, indexToDelete - 1); 
-        } else if (currentHotelIndex > indexToDelete) { 
-            newActiveIndex = currentHotelIndex - 1; 
-        } else { 
-            newActiveIndex = currentHotelIndex; 
+    allHotelData.splice(indexToDelete, 1);
+
+    let newActiveIndex = -1;
+    if (allHotelData.length > 0) {
+        if (currentHotelIndex === indexToDelete) {
+            newActiveIndex = Math.max(0, indexToDelete - 1);
+        } else if (currentHotelIndex > indexToDelete) {
+            newActiveIndex = currentHotelIndex - 1;
+        } else {
+            newActiveIndex = currentHotelIndex;
         }
         newActiveIndex = Math.min(newActiveIndex, allHotelData.length - 1);
     }
-    
+
     switchTab(newActiveIndex);
 }
 
 function syncCurrentHotelData() {
-    if (currentHotelIndex === -1 || !allHotelData[currentHotelIndex]) {
+    if (currentHotelIndex === -1 || currentHotelIndex >= allHotelData.length || !allHotelData[currentHotelIndex]) {
         return;
     }
     if (!hotelNameKoInput || !hotelNameEnInput || !hotelWebsiteInput || !hotelImageInput || !hotelDescriptionInput) {
@@ -303,93 +346,61 @@ function syncCurrentHotelData() {
     hotel.description = hotelDescriptionInput.value.trim();
 }
 
-// ===================================================================================
-// START: 엑셀 데이터 붙여넣기 기능 수정 (TSV 파싱 개선)
-// ===================================================================================
-
-/**
- * TSV 텍스트를 파싱하여 실제 행(row) 단위로 분리합니다.
- * 큰따옴표로 감싸진 필드 내의 줄바꿈은 행 분리 기준으로 보지 않습니다.
- * (주의: 이 함수는 간단한 TSV 형식에 맞춰져 있으며, 모든 CSV/TSV 엣지 케이스를 완벽히 처리하지 못할 수 있습니다.)
- * @param {string} text - 전체 TSV 텍스트
- * @returns {string[]} - 실제 행들의 배열
- */
 function splitTsvRows(text) {
     const rows = [];
     let currentRowStart = 0;
     let inQuotes = false;
-
-    // 원본 텍스트의 \r\n 을 \n으로 통일하고, \r만 있는 경우도 \n으로 변경 (일관성 유지)
     const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
     for (let i = 0; i < normalizedText.length; i++) {
         const char = normalizedText[i];
         if (char === '"') {
-            // 매우 기본적인 따옴표 처리: 따옴표 쌍이 필드를 감싸는 경우를 위주로 함
-            // TODO: 필드 내부에 "" 형태로 이스케이프된 따옴표가 있는 경우 더 정교한 처리가 필요할 수 있음
             inQuotes = !inQuotes;
         }
         if (char === '\n' && !inQuotes) {
-            rows.push(normalizedText.substring(currentRowStart, i).trim()); // trim()으로 각 행의 앞뒤 공백 제거
+            rows.push(normalizedText.substring(currentRowStart, i).trim());
             currentRowStart = i + 1;
         }
     }
-    // 마지막 행 추가
     rows.push(normalizedText.substring(currentRowStart).trim());
-    return rows.filter(row => row.length > 0); // 내용이 있는 행만 반환
+    return rows.filter(row => row.length > 0);
 }
 
-
-/**
- * TSV (Tab Separated Values) 형식의 텍스트 데이터를 파싱하여 호텔 정보를 가져옵니다.
- * 옵션 1 적용: 현재 선택된 호텔 덮어쓰기 후, 나머지는 뒤에 새 탭으로 추가.
- * @param {string} tsvData - 탭으로 구분된 호텔 정보 텍스트.
- * @returns {object} - { importedCount: number, errors: string[], affectedIndex: number }
- */
 function importHotelsFromTSV(tsvData) {
-    // 개선된 행 분리 로직 사용
     const lines = splitTsvRows(tsvData);
-
     if (lines.length === 0) {
         return { importedCount: 0, errors: [], affectedIndex: currentHotelIndex };
     }
-
     let importedCount = 0;
-    const errors = []; 
-    let affectedIndex = currentHotelIndex; 
-
-    // 각 필드 값에서 앞뒤 따옴표 제거하는 헬퍼 함수
+    const errors = [];
+    let affectedIndex = currentHotelIndex;
     function cleanFieldValue(value) {
         if (typeof value !== 'string') return "";
         let cleanedValue = value.trim();
-        // 앞뒤 쌍따옴표 제거 (예: "내용" -> 내용)
         if (cleanedValue.startsWith('"') && cleanedValue.endsWith('"')) {
             cleanedValue = cleanedValue.substring(1, cleanedValue.length - 1);
-            // 따옴표 제거 후, 내부의 이스케이프된 따옴표 ("")를 단일 따옴표 (")로 변환 (필요시)
-            // cleanedValue = cleanedValue.replace(/""/g, '"'); // 현재 예시에서는 불필요하나, 일반적 TSV를 위해 고려
         }
         return cleanedValue;
     }
 
+    syncCurrentHotelData();
+
     if (currentHotelIndex !== -1 && allHotelData[currentHotelIndex] && lines.length > 0) {
         const firstLineColumnsRaw = lines[0].split('\t');
-        const firstLineColumns = firstLineColumnsRaw.map(cleanFieldValue); // 각 필드 정리
+        const firstLineColumns = firstLineColumnsRaw.map(cleanFieldValue);
         const hotelToUpdate = allHotelData[currentHotelIndex];
-        
         hotelToUpdate.nameKo = firstLineColumns[0] || "";
         hotelToUpdate.nameEn = firstLineColumns[1] || "";
         hotelToUpdate.website = firstLineColumns[2] || "";
         hotelToUpdate.image = firstLineColumns[3] || "";
-        hotelToUpdate.description = firstLineColumns[4] || ""; // 이미 cleanFieldValue에서 처리됨
+        hotelToUpdate.description = firstLineColumns[4] || "";
         importedCount++;
-        affectedIndex = currentHotelIndex; 
-
+        affectedIndex = currentHotelIndex;
         if (lines.length > 1) {
             const remainingLines = lines.slice(1);
             const newHotelsToInsert = [];
             remainingLines.forEach((line) => {
                 const columnsRaw = line.split('\t');
-                const columns = columnsRaw.map(cleanFieldValue); // 각 필드 정리
+                const columns = columnsRaw.map(cleanFieldValue);
                 newHotelsToInsert.push({
                     nameKo: columns[0] || "",
                     nameEn: columns[1] || "",
@@ -402,11 +413,11 @@ function importHotelsFromTSV(tsvData) {
             importedCount += newHotelsToInsert.length;
         }
     } else {
-        affectedIndex = allHotelData.length; 
+        const newHotelsFromTsv = [];
         lines.forEach((line) => {
             const columnsRaw = line.split('\t');
-            const columns = columnsRaw.map(cleanFieldValue); // 각 필드 정리
-            allHotelData.push({
+            const columns = columnsRaw.map(cleanFieldValue);
+            newHotelsFromTsv.push({
                 nameKo: columns[0] || "",
                 nameEn: columns[1] || "",
                 website: columns[2] || "",
@@ -415,17 +426,293 @@ function importHotelsFromTSV(tsvData) {
             });
             importedCount++;
         });
-        if (importedCount === 0 && allHotelData.length === 0) affectedIndex = -1;
-        else if (importedCount === 0 && allHotelData.length > 0) affectedIndex = currentHotelIndex; // 변경 없음
+        allHotelData.push(...newHotelsFromTsv);
+        affectedIndex = (allHotelData.length > 0) ? Math.max(0, allHotelData.length - newHotelsFromTsv.length) : -1;
+        if (allHotelData.length === 0) affectedIndex = -1;
     }
-
     return { importedCount, errors, affectedIndex };
 }
-// ===================================================================================
-// END: 엑셀 데이터 붙여넣기 기능 수정
-// ===================================================================================
 
 
+// --- Firestore 연동 함수 ---
+
+async function saveHotelSetToFirestore(isSaveAsNew = false) {
+    if (!db || !serverTimestamp) { showToastMessage("Firestore가 초기화되지 않았거나 서버 시간 기능을 사용할 수 없습니다.", true); return; }
+    syncCurrentHotelData();
+
+    if (allHotelData.length === 0) {
+        showToastMessage("저장할 호텔 정보가 없습니다.", true);
+        return;
+    }
+
+    let docName = currentHotelDocumentName;
+    let promptDefaultName = currentHotelDocumentName === "새 호텔 정보 모음" ? "내 호텔 정보" : currentHotelDocumentName;
+
+    if (isSaveAsNew || !currentHotelDocumentId) {
+        if (currentHotelIndex !== -1 && currentHotelIndex < allHotelData.length && allHotelData[currentHotelIndex] && allHotelData[currentHotelIndex].nameKo) {
+            promptDefaultName = allHotelData[currentHotelIndex].nameKo;
+        } else if (allHotelData.length > 0 && allHotelData[0] && allHotelData[0].nameKo) {
+            promptDefaultName = allHotelData[0].nameKo;
+        }
+
+        const newName = prompt("이 호텔 정보 모음을 어떤 이름으로 저장하시겠습니까?", promptDefaultName);
+        if (!newName || newName.trim() === "") {
+            showToastMessage("이름이 입력되지 않아 저장이 취소되었습니다.", true);
+            return;
+        }
+        docName = newName.trim();
+    }
+
+
+    const dataToSave = {
+        name: docName,
+        hotels: JSON.parse(JSON.stringify(allHotelData)),
+        timestamp: serverTimestamp
+    };
+
+    try {
+        if (currentHotelDocumentId && !isSaveAsNew) {
+            await db.collection("hotels").doc(currentHotelDocumentId).set(dataToSave, { merge: true });
+            currentHotelDocumentName = docName;
+            renderTabs();
+            showToastMessage(`'${docName}' 정보가 Firestore에 업데이트되었습니다.`);
+        } else {
+            const docRef = await db.collection("hotels").add(dataToSave);
+            currentHotelDocumentId = docRef.id;
+            currentHotelDocumentName = docName;
+            renderTabs();
+            showToastMessage(`'${docName}' 정보가 새롭게 Firestore에 저장되었습니다.`);
+        }
+    } catch (error) {
+        console.error("Error saving hotel set to Firestore: ", error);
+        showToastMessage("정보 저장 중 오류 발생: " + error.message, true);
+    }
+}
+
+async function handleSaveHotelSetAsNew() {
+    await saveHotelSetToFirestore(true);
+}
+
+// 수정 1: 불러오기 시 데이터 누적
+async function loadHotelSetFromFirestore(docId) {
+    if (!db) { showToastMessage("Firestore가 초기화되지 않았습니다.", true); return; }
+    if (!docId) { showToastMessage("불러올 문서 ID가 없습니다.", true); return; }
+
+    try {
+        const doc = await db.collection("hotels").doc(docId).get();
+        if (doc.exists) {
+            const loadedData = doc.data();
+            const newHotels = loadedData.hotels || [];
+
+            // 불러온 문서의 ID와 이름으로 현재 작업 상태를 업데이트 (선택적)
+            // 사용자가 여러 문서를 계속 누적 로드할 경우, 마지막으로 로드한 문서의 정보가 currentXXX 변수에 남게 됨.
+            currentHotelDocumentId = doc.id;
+            currentHotelDocumentName = loadedData.name || "이름 없는 정보";
+
+            if (newHotels.length > 0) {
+                const firstNewHotelIndex = allHotelData.length; // 기존 데이터의 끝, 즉 새 데이터의 시작 인덱스
+                allHotelData.push(...newHotels); // 기존 데이터 뒤에 새 호텔 데이터 추가
+                renderTabs(); // 탭 목록 업데이트
+                switchTab(firstNewHotelIndex); // 새로 추가된 첫 번째 탭으로 이동
+                showToastMessage(`'${currentHotelDocumentName}'의 호텔 ${newHotels.length}개를 현재 목록 끝에 추가했습니다.`);
+            } else {
+                // 불러온 문서에 호텔 데이터가 없는 경우
+                if (allHotelData.length === 0) { // 현재 앱에도 데이터가 없었다면
+                    addHotel(); // 기본 빈 호텔 하나 추가
+                    showToastMessage(`'${currentHotelDocumentName}'은(는) 비어있어 새 호텔 탭을 시작합니다.`);
+                } else {
+                    // 이미 데이터가 있는데 빈 세트를 불러오려고 하면, 그냥 메시지만 표시
+                    showToastMessage(`'${currentHotelDocumentName}'에 추가할 호텔 정보가 없습니다.`);
+                }
+                renderTabs(); // 현재 문서 이름 표시 업데이트를 위해 호출
+            }
+            if(loadHotelSetModal) loadHotelSetModal.classList.add('hidden'); // 모달 닫기
+        } else {
+            showToastMessage("해당 ID의 문서를 찾을 수 없습니다.", true);
+        }
+    } catch (error) {
+        console.error("Error loading hotel set from Firestore: ", error);
+        showToastMessage("정보 불러오기 중 오류 발생: " + error.message, true);
+    }
+}
+
+
+// 수정 3: 모달 클릭 동작 변경을 위한 함수
+async function renameHotelSetInFirestore(docId, currentName) {
+    if (!db || !serverTimestamp) { showToastMessage("Firestore에 연결할 수 없습니다.", true); return; }
+    if (!docId) { showToastMessage("수정할 문서 ID가 없습니다.", true); return; }
+
+    const newName = prompt(`"${currentName}"의 새 이름을 입력하세요:`, currentName);
+    if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
+        const updatedName = newName.trim();
+        try {
+            await db.collection("hotels").doc(docId).update({
+                name: updatedName,
+                timestamp: serverTimestamp // 수정 시간도 업데이트
+            });
+            showToastMessage(`이름이 "${updatedName}"으로 변경되었습니다.`);
+            // 로컬 목록(allFetchedHotelSets)도 업데이트하고 모달 다시 렌더링
+            const setToUpdate = allFetchedHotelSets.find(set => set.id === docId);
+            if (setToUpdate) {
+                setToUpdate.name = updatedName;
+            }
+            renderFilteredHotelSetList(); // 모달 목록 새로고침
+            if (currentHotelDocumentId === docId) { // 현재 작업중인 문서의 이름이 변경된 경우
+                currentHotelDocumentName = updatedName;
+                renderTabs(); // UI (문서 제목 등) 업데이트
+            }
+        } catch (error) {
+            console.error("Error renaming hotel set: ", error);
+            showToastMessage("이름 변경 중 오류 발생: " + error.message, true);
+        }
+    } else if (newName && newName.trim() === currentName) {
+        // 이름 변경 없음
+    } else {
+        showToastMessage("이름 변경이 취소되었습니다.");
+    }
+}
+
+
+function renderFilteredHotelSetList() {
+    if (!hotelSetListForLoad || !hotelSetSearchInput) return;
+
+    const searchTerm = hotelSetSearchInput.value.toLowerCase();
+    hotelSetListForLoad.innerHTML = '';
+
+    const filteredSets = allFetchedHotelSets.filter(set =>
+        set.name.toLowerCase().includes(searchTerm)
+    );
+
+    if (filteredSets.length > 0) {
+        filteredSets.forEach(set => {
+            const listItem = document.createElement('li');
+            listItem.className = 'flex justify-between items-center p-3 hover:bg-gray-50 cursor-pointer';
+
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = set.name;
+            titleSpan.className = 'text-sm font-medium text-gray-900 flex-grow';
+            titleSpan.title = `"${set.name}" 정보 불러오기 (클릭) / 이름 수정 (더블클릭)`;
+            titleSpan.dataset.docId = set.id;
+            titleSpan.dataset.docName = set.name;
+
+            // --- 수정된 클릭 및 더블클릭 이벤트 핸들러 ---
+            let clickTimer = null;
+            const clickDelay = 250;
+
+            titleSpan.addEventListener('click', () => {
+                if (clickTimer === null) {
+                    clickTimer = setTimeout(() => {
+                        clickTimer = null;
+                        loadHotelSetFromFirestore(set.id);
+                    }, clickDelay);
+                } else {
+                    clearTimeout(clickTimer);
+                    clickTimer = null;
+                }
+            });
+
+            titleSpan.addEventListener('dblclick', () => {
+                if (clickTimer) {
+                    clearTimeout(clickTimer);
+                    clickTimer = null;
+                }
+                renameHotelSetInFirestore(set.id, set.name);
+            });
+            // --- 수정된 클릭 및 더블클릭 이벤트 핸들러 끝 ---
+
+
+            const deleteButton = document.createElement('button');
+            deleteButton.innerHTML = `<svg class="w-5 h-5 text-gray-400 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
+            deleteButton.className = 'p-1 rounded-full hover:bg-red-100 ml-2';
+            deleteButton.title = `"${set.name}" 정보 삭제`;
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteHotelSetFromFirestore(set.id, set.name);
+            });
+
+            listItem.appendChild(titleSpan);
+            listItem.appendChild(deleteButton);
+            hotelSetListForLoad.appendChild(listItem);
+        });
+    } else {
+        const isLoading = loadingHotelSetListMsg && loadingHotelSetListMsg.style.display !== 'none';
+        if (!isLoading) {
+             if (searchTerm && allFetchedHotelSets.length > 0) {
+                hotelSetListForLoad.innerHTML = `<li class="p-3 text-sm text-gray-500 text-center">"'${hotelSetSearchInput.value}'" 검색 결과가 없습니다.</li>`;
+            } else if (allFetchedHotelSets.length === 0) {
+                hotelSetListForLoad.innerHTML = '<li class="p-3 text-sm text-gray-500 text-center">저장된 호텔 정보가 없습니다.</li>';
+            }
+        }
+    }
+}
+
+async function openLoadHotelSetModal() {
+    if (!db) { showToastMessage("Firestore가 초기화되지 않았습니다.", true); return; }
+    if (!loadHotelSetModal || !hotelSetListForLoad || !loadingHotelSetListMsg || !hotelSetSearchInput) {
+        console.error("호텔 정보 불러오기 모달 관련 DOM 요소를 찾을 수 없습니다.");
+        showToastMessage("UI가 준비되지 않았습니다.", true);
+        return;
+    }
+
+    loadingHotelSetListMsg.textContent = "목록을 불러오는 중...";
+    loadingHotelSetListMsg.style.display = 'block';
+    hotelSetListForLoad.innerHTML = '';
+    hotelSetSearchInput.value = '';
+
+    loadHotelSetModal.classList.remove('hidden');
+    allFetchedHotelSets = [];
+
+    try {
+        const querySnapshot = await db.collection("hotels").orderBy("timestamp", "desc").get();
+        querySnapshot.forEach((doc) => {
+            allFetchedHotelSets.push({ id: doc.id, name: doc.data().name || "이름 없는 정보" });
+        });
+        loadingHotelSetListMsg.style.display = 'none';
+        renderFilteredHotelSetList();
+    } catch (error) {
+        console.error("Error loading hotel set list from Firestore: ", error);
+        showToastMessage("목록 불러오기 중 오류 발생: " + error.message, true);
+        if (loadingHotelSetListMsg) loadingHotelSetListMsg.textContent = "목록 불러오기 중 오류가 발생했습니다.";
+        allFetchedHotelSets = [];
+        if (loadingHotelSetListMsg) loadingHotelSetListMsg.style.display = 'none';
+        renderFilteredHotelSetList();
+    }
+}
+
+async function deleteHotelSetFromFirestore(docId, docName) {
+    if (!db) { showToastMessage("Firestore가 초기화되지 않았습니다.", true); return; }
+    if (!docId) { showToastMessage("삭제할 문서 ID가 없습니다.", true); return; }
+
+    if (!confirm(`"${docName}" 정보를 정말로 Firestore에서 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+        return;
+    }
+
+    try {
+        await db.collection("hotels").doc(docId).delete();
+        showToastMessage(`"${docName}" 정보가 Firestore에서 삭제되었습니다.`);
+
+        if (currentHotelDocumentId === docId) { // 현재 작업중인 문서가 삭제된 경우
+            currentHotelDocumentId = null;
+            currentHotelDocumentName = "새 호텔 정보 모음";
+            allHotelData = []; // 현재 데이터 초기화
+            addHotel();
+            renderTabs();
+        }
+
+        // 모달이 열려있다면 목록 새로고침
+        if (loadHotelSetModal && !loadHotelSetModal.classList.contains('hidden')) {
+            allFetchedHotelSets = allFetchedHotelSets.filter(set => set.id !== docId);
+            renderFilteredHotelSetList();
+        }
+
+    } catch (error) {
+        console.error("Error deleting hotel set from Firestore: ", error);
+        showToastMessage(`"${docName}" 정보 삭제 중 오류 발생: ${error.message}`, true);
+    }
+}
+
+
+// --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', function () {
     hotelTabsContainer = document.getElementById('hotelTabsContainer');
     addHotelTabBtn = document.getElementById('addHotelTabBtn');
@@ -441,141 +728,102 @@ document.addEventListener('DOMContentLoaded', function () {
     savePreviewHtmlBtn = document.getElementById('savePreviewHtmlBtn');
     copyHtmlBtn = document.getElementById('copyHtmlBtn');
     manualBtn = document.getElementById('manualBtn');
-    hotelHtmlLoadInput = document.getElementById('hotelHtmlLoadInput');
+    currentDocumentNameDisplay = document.getElementById('currentDocumentNameDisplay');
+
+
+    loadHotelSetModal = document.getElementById('loadHotelSetModal');
+    hotelSetSearchInput = document.getElementById('hotelSetSearchInput');
+    hotelSetListForLoad = document.getElementById('hotelSetListForLoad');
+    loadingHotelSetListMsg = document.getElementById('loadingHotelSetListMsg');
+    cancelLoadHotelSetModalButton = document.getElementById('cancelLoadHotelSetModalButton');
+    closeLoadHotelSetModalButton = document.getElementById('closeLoadHotelSetModalButton');
+
 
     if (addHotelTabBtn) addHotelTabBtn.addEventListener('click', addHotel);
     if (previewHotelBtn) previewHotelBtn.addEventListener('click', previewHotelInfo);
     if (copyHtmlBtn) copyHtmlBtn.addEventListener('click', copyOptimizedHtml);
-
     if (manualBtn) {
         manualBtn.addEventListener('click', () => {
-            window.open('https://kaknakiak.github.io/hotelinformation/manual/', '_blank');
+            window.open('manual/index.html', '_blank');
         });
     }
-    
+
     if (savePreviewHtmlBtn) {
-        savePreviewHtmlBtn.addEventListener('click', () => {
-            syncCurrentHotelData();
-            if (allHotelData.length === 0) {
-                alert('저장할 호텔 정보가 없습니다.');
-                return;
-            }
-            if (!confirm(`총 ${allHotelData.length}개의 호텔 안내 HTML 파일을 각각 저장하시겠습니까?`)) {
-                return;
-            }
-            allHotelData.forEach((hotel, index) => {
-                const finalHtml = generateFullPreviewHtml([hotel]);
-                const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' });
-                const link = document.createElement('a');
-                const safeFileName = (hotel.nameKo || `호텔_${index + 1}`).replace(/[\s\/\\?%*:|"<>]/g, '_');
-                link.download = `${safeFileName}_안내.html`;
-                link.href = URL.createObjectURL(blob);
-                link.click();
-                URL.revokeObjectURL(link.href);
-            });
-            alert(`${allHotelData.length}개의 호텔 안내 파일 저장이 시작되었습니다.`);
-        });
+        savePreviewHtmlBtn.addEventListener('click', handleSaveHotelSetAsNew);
     }
 
     [hotelNameKoInput, hotelNameEnInput, hotelWebsiteInput, hotelImageInput, hotelDescriptionInput].forEach(input => {
         if (input) {
             input.addEventListener('input', () => {
                 syncCurrentHotelData();
-                if (input.id === 'hotelNameKo' && currentHotelIndex !== -1) {
+                if (input.id === 'hotelNameKo' && currentHotelIndex !== -1 && currentHotelIndex < allHotelData.length) {
                     renderTabs();
                 }
-                if (input.value !== '') {
-                    input.placeholder = ' ';
-                }
+                if (input.value !== '') input.placeholder = ' ';
             });
         }
     });
 
     if (saveHotelHtmlBtn) {
         saveHotelHtmlBtn.addEventListener('click', () => {
-            syncCurrentHotelData(); 
-            if (allHotelData.length === 0) { alert('저장할 호텔 정보가 없습니다.'); return; }
-            if (!confirm(`총 ${allHotelData.length}개의 호텔 정보를 각각 개별 파일로 저장하시겠습니까?`)) return;
-            allHotelData.forEach((hotel, index) => {
-                const singleHotelDataArray = [hotel];
-                const dataStr = JSON.stringify(singleHotelDataArray);
-                const htmlContent = `<!DOCTYPE html><html><head><title>저장된 호텔 데이터</title></head><body><script type="application/json" id="embeddedHotelData">${dataStr.replace(/<\/script>/g, '<\\/script>')}<\/script><p>이 파일은 호텔 정보 복원용입니다. 편집기에서 '데이터 불러오기'로 열어주세요.</p></body></html>`;
-                const blob = new Blob([htmlContent], { type: 'text/html' });
-                const a = document.createElement('a');
-                const safeFileName = (hotel.nameKo || `호텔_데이터_${index + 1}`).replace(/[\s\/\\?%*:|"<>]/g, '_');
-                a.download = `${safeFileName}_데이터.html`;
-                a.href = URL.createObjectURL(blob);
-                a.click();
-                URL.revokeObjectURL(a.href);
-            });
-            alert(`${allHotelData.length}개의 호텔 정보 파일 저장이 시작되었습니다.`);
+            syncCurrentHotelData();
+            if (!currentHotelDocumentId) {
+                if(confirm("현재 작업 내용이 특정 파일과 연결되어 있지 않습니다. '다른 이름으로 저장'을 먼저 진행하시겠습니까? \n(취소 시 저장되지 않습니다.)")) {
+                    handleSaveHotelSetAsNew();
+                } else {
+                     showToastMessage("저장이 취소되었습니다. '다른 이름으로 저장'을 통해 새 파일로 저장하거나, 기존 파일을 '불러오기' 후 작업하세요.", true);
+                }
+                return;
+            }
+            saveHotelSetToFirestore(false);
         });
     }
 
     if (loadHotelHtmlBtn) {
-        loadHotelHtmlBtn.addEventListener('click', () => hotelHtmlLoadInput.click());
+        loadHotelHtmlBtn.addEventListener('click', openLoadHotelSetModal);
     }
-    
-    if (hotelHtmlLoadInput) {
-        hotelHtmlLoadInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const doc = new DOMParser().parseFromString(event.target.result, 'text/html');
-                    const dataScript = doc.getElementById('embeddedHotelData');
-                    if (!dataScript || !dataScript.textContent) throw new Error('파일에서 호텔 데이터를 찾을 수 없습니다.');
-                    const loadedDataArray = JSON.parse(dataScript.textContent);
-                    if (!Array.isArray(loadedDataArray)) throw new Error('데이터 형식이 올바지 않습니다 (배열이 아님).');
-                    const newHotels = loadedDataArray.map(hotel => ({
-                        nameKo: hotel.nameKo || "",
-                        nameEn: hotel.nameEn || "",
-                        website: hotel.website || "",
-                        image: hotel.image || "",
-                        description: hotel.description || ""
-                    }));
-                    allHotelData.push(...newHotels);
-                    switchTab(allHotelData.length - 1);
-                    alert(`호텔 ${newHotels.length}개를 성공적으로 불러왔습니다.`);
-                } catch (err) {
-                    alert(`파일 처리 오류: ${err.message}`);
-                    console.error("File loading error:", err);
-                }
-            };
-            reader.readAsText(file);
-            e.target.value = '';
+
+    if (cancelLoadHotelSetModalButton) {
+        cancelLoadHotelSetModalButton.addEventListener('click', () => {
+            if(loadHotelSetModal) loadHotelSetModal.classList.add('hidden');
         });
+    }
+    if (closeLoadHotelSetModalButton) {
+        closeLoadHotelSetModalButton.addEventListener('click', () => {
+            if(loadHotelSetModal) loadHotelSetModal.classList.add('hidden');
+        });
+    }
+
+    if (hotelSetSearchInput) {
+        hotelSetSearchInput.addEventListener('input', renderFilteredHotelSetList);
     }
 
     if (hotelEditorForm) {
         hotelEditorForm.addEventListener('paste', function(event) {
             const pastedText = (event.clipboardData || window.clipboardData).getData('text/plain');
-            const isTSVLike = pastedText.includes('\t'); 
+            const isTSVLike = pastedText.includes('\t');
 
             if (isTSVLike) {
-                if (confirm('엑셀/표 형식의 데이터를 붙여넣어 호텔 정보를 처리하시겠습니까?\n(선택된 호텔이 있으면 첫 줄로 덮어쓰고 나머지는 뒤에 추가, 없으면 모두 새 호텔로 추가됩니다.)')) {
-                    event.preventDefault(); 
-                    syncCurrentHotelData();
+                if (confirm('엑셀/표 형식의 데이터를 붙여넣어 호텔 정보를 처리하시겠습니까?\n(선택된 호텔이 있으면 첫 줄로 덮어쓰고 나머지는 뒤에 추가, 없으면 모두 새 호텔로 추가됩니다.)\n주의: 이 작업은 현재 편집 중인 목록에만 적용되며, Firebase에 저장하려면 별도로 "저장" 또는 "다른 이름으로 저장"을 해야 합니다.')) {
+                    event.preventDefault();
                     const result = importHotelsFromTSV(pastedText);
 
                     if (result.importedCount > 0) {
-                        alert(`${result.importedCount}개의 호텔 정보가 처리되었습니다.`);
+                        alert(`${result.importedCount}개의 호텔 정보가 현재 목록에 처리되었습니다.`);
                         renderTabs();
                         if (result.affectedIndex !== -1 && result.affectedIndex < allHotelData.length) {
                             switchTab(result.affectedIndex);
                         } else if (allHotelData.length > 0) {
-                            switchTab(0); 
+                            switchTab(0);
                         } else {
-                            switchTab(-1); 
+                            switchTab(-1);
                         }
                     } else {
                         alert('붙여넣은 데이터에서 유효한 호텔 정보를 찾을 수 없거나, 형식이 맞지 않습니다.');
                     }
-
-                    if (result.errors.length > 0) { 
+                    if (result.errors.length > 0) {
                         console.warn("Import errors:\n" + result.errors.join("\n"));
-                        alert(`가져오기 중 ${result.errors.length}개의 항목에서 오류가 발생했습니다. 자세한 내용은 개발자 콘솔을 확인하세요.`);
+                        alert(`가져오기 중 ${result.errors.length}개의 항목에서 오류가 발생했습니다. 개발자 콘솔을 확인하세요.`);
                     }
                 }
             }
@@ -583,12 +831,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (allHotelData.length === 0) {
-        addHotel(); 
+        addHotel();
     } else {
         if(currentHotelIndex === -1 && allHotelData.length > 0) {
             switchTab(0);
         } else {
-            switchTab(currentHotelIndex); 
+            switchTab(currentHotelIndex);
         }
     }
+    renderTabs();
 });
