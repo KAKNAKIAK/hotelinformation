@@ -272,7 +272,9 @@ function renderEditorForCurrentHotel() {
         hotelImageInput.value = '';
         hotelDescriptionInput.value = '';
         document.querySelectorAll('#hotelEditorForm input, #hotelEditorForm textarea').forEach(el => {
-            if (el.value === '') el.placeholder = ' ';
+            el.placeholder = ' '; // Ensure labels float correctly if inputs are empty
+            if (el.id === 'hotelNameKo') el.placeholder = '호텔명 (한글)'; // Restore original placeholder for key fields if desired
+            // Add more specific placeholders if needed, or keep generic ' '
         });
         return;
     }
@@ -286,6 +288,14 @@ function renderEditorForCurrentHotel() {
     hotelDescriptionInput.value = hotel.description || '';
     document.querySelectorAll('#hotelEditorForm input, #hotelEditorForm textarea').forEach(el => {
         if (el.value !== '') el.placeholder = ' ';
+        else { // Restore original-like behavior for empty fields for floating labels
+            if (el.id === 'hotelNameKo' && !el.value) el.placeholder = '호텔명 (한글)';
+            else if (el.id === 'hotelNameEn' && !el.value) el.placeholder = '호텔명 (영문)';
+            else if (el.id === 'hotelWebsite' && !el.value) el.placeholder = '호텔 웹사이트';
+            else if (el.id === 'hotelImage' && !el.value) el.placeholder = '대표 이미지 URL';
+            else if (el.id === 'hotelDescription' && !el.value) el.placeholder = '간단 설명 (줄바꿈으로 항목 구분)';
+            else if (!el.value) el.placeholder = ' ';
+        }
     });
 }
 
@@ -293,7 +303,7 @@ function switchTab(index) {
     if (allHotelData.length === 0) {
         currentHotelIndex = -1;
     } else if (index < 0 || index >= allHotelData.length) {
-        currentHotelIndex = 0;
+        currentHotelIndex = 0; // Default to first tab if index is invalid but data exists
     } else {
         currentHotelIndex = index;
     }
@@ -695,8 +705,9 @@ async function deleteHotelSetFromFirestore(docId, docName) {
             currentHotelDocumentId = null;
             currentHotelDocumentName = "새 호텔 정보 모음";
             allHotelData = []; // 현재 데이터 초기화
-            addHotel();
+            // addHotel(); // 삭제 후 자동으로 새 호텔을 추가하지 않고, 사용자가 직접 추가하도록 변경
             renderTabs();
+            renderEditorForCurrentHotel(); // 편집기 비활성화
         }
 
         // 모달이 열려있다면 목록 새로고침
@@ -759,8 +770,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (input.id === 'hotelNameKo' && currentHotelIndex !== -1 && currentHotelIndex < allHotelData.length) {
                     renderTabs();
                 }
-                if (input.value !== '') input.placeholder = ' ';
+                // Handle placeholder for floating labels
+                if (input.value !== '') {
+                    input.placeholder = ' ';
+                } else {
+                    // Restore original-like placeholder if field is cleared
+                    if (input.id === 'hotelNameKo') input.placeholder = '호텔명 (한글)';
+                    else if (input.id === 'hotelNameEn') input.placeholder = '호텔명 (영문)';
+                    else if (input.id === 'hotelWebsite') input.placeholder = '호텔 웹사이트';
+                    else if (input.id === 'hotelImage') input.placeholder = '대표 이미지 URL';
+                    else if (input.id === 'hotelDescription') input.placeholder = '간단 설명 (줄바꿈으로 항목 구분)';
+                    // No need for a generic ' ' here as the CSS handles it with :not(:placeholder-shown)
+                }
             });
+             // Ensure labels float correctly on load if there's pre-filled data (e.g. from a load operation later)
+            if (input.value !== '') {
+                input.placeholder = ' ';
+            }
         }
     });
 
@@ -830,14 +856,22 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (allHotelData.length === 0) {
-        addHotel();
-    } else {
-        if(currentHotelIndex === -1 && allHotelData.length > 0) {
-            switchTab(0);
-        } else {
-            switchTab(currentHotelIndex);
-        }
-    }
-    renderTabs();
+    // *** 요청사항 반영: 초기 addHotel() 호출 제거 ***
+    // 기존 코드:
+    // if (allHotelData.length === 0) {
+    //     addHotel();
+    // } else {
+    //     if(currentHotelIndex === -1 && allHotelData.length > 0) {
+    //         switchTab(0);
+    //     } else {
+    //         switchTab(currentHotelIndex);
+    //     }
+    // }
+    // renderTabs(); // 이 부분은 아래 renderTabs()와 renderEditorForCurrentHotel()로 대체/보강
+
+    // 수정된 초기화:
+    // currentHotelIndex는 전역 변수로 -1로 초기화되어 있고, allHotelData는 []로 초기화되어 있음.
+    // 따라서 아무 호텔도 없는 상태로 시작.
+    renderTabs(); // 탭 UI 업데이트 (문서 이름 표시 등)
+    renderEditorForCurrentHotel(); // 편집기 폼 비활성화 및 필드 초기화
 });
