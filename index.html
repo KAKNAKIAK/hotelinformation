@@ -11,15 +11,15 @@
 <body>
     <div class="editor-container">
         <div class="editor-controls">
-            <h2><b>인보이스용<P>호텔카드<P>메이커</P></b></h2>
+            <h2><b>인보이스용<P>호텔카드<P>메이커</P></b><span id="currentDocumentNameDisplay" class="text-sm font-normal text-gray-600 ml-2"></span></h2>
             <div class="control-buttons flex flex-wrap gap-2 justify-end">
                 <button id="manualBtn" class="btn-manual"><i class="fas fa-book-open"></i>사용 메뉴얼</button>
                 <button id="copyHtmlBtn" class="btn-copy-html"><i class="fas fa-copy"></i>코드 복사</button>
-                <button id="savePreviewHtmlBtn" class="btn-save-preview-html"><i class="fas fa-file-alt"></i>HTML 저장</button>
+                <button id="savePreviewHtmlBtn" class="btn-save-preview-html"><i class="fas fa-file-alt"></i>다른 이름으로 저장</button>
                 <button id="previewHotelBtn" class="btn-preview"><i class="fas fa-eye"></i>미리보기</button>
                 <p>
-                <button id="saveHotelHtmlBtn" class="btn-save"><i class="fas fa-database"></i>데이터 저장</button>
-                <button id="loadHotelHtmlBtn" class="btn-load-html"><i class="fas fa-upload"></i>데이터 불러오기</button>
+                <button id="saveHotelHtmlBtn" class="btn-save"><i class="fas fa-database"></i>저장</button>
+                <button id="loadHotelHtmlBtn" class="btn-load-html"><i class="fas fa-upload"></i>불러오기</button>
                 </p>
             </div>
         </div>
@@ -60,8 +60,28 @@
         </div>
     </div>
 
-    <input type="file" id="hotelHtmlLoadInput" accept=".html" style="display: none;">
+    <div id="loadHotelSetModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+        <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-medium leading-6 text-gray-900">저장된 호텔 정보 불러오기</h3>
+                <button id="closeLoadHotelSetModalButton" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <input type="text" id="hotelSetSearchInput" placeholder="저장된 이름으로 검색..." class="w-full p-2 mb-3 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+            <ul id="hotelSetListForLoad" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y divide-gray-200">
+                </ul>
+            <div id="loadingHotelSetListMsg" class="mt-2 text-sm text-gray-500" style="display:none;">목록을 불러오는 중...</div>
+            <div class="mt-4">
+                <button id="cancelLoadHotelSetModalButton" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                    닫기
+                </button>
+            </div>
+        </div>
+    </div>
     
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
