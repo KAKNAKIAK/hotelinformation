@@ -78,13 +78,14 @@ body {
     font-weight: 500;
     color: #4a5568;
     cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 180px;
-    display: inline-flex;
-    align-items: center;
+    max-width: 180px;        /* 탭 버튼의 최대 너비 */
+    display: inline-flex;    /* 내부 요소(제목, 아이콘)를 flex로 정렬 */
+    align-items: center;     /* 내부 요소 수직 중앙 정렬 */
     transition: all 0.2s ease-in-out;
+    /* 아래 3개 속성은 버튼 전체가 넘칠 때를 위함이지만, .tab-title 에서도 명시하는 것이 좋습니다. */
+    /* white-space: nowrap; */ /* 자식 요소에서 처리하므로 여기서는 제거 또는 주석 처리 가능 */
+    /* overflow: hidden; */
+    /* text-overflow: ellipsis; */
 }
 .hotel-tab-button:hover {
     color: #2c5282;
@@ -177,6 +178,3 @@ body {
     pointer-events: none;
     filter: grayscale(50%);
 }
-
-.btn-manual { background-color: #64748b; }
-.btn-manual:hover { background-color: #475569; }
